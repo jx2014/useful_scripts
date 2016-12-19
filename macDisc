@@ -1,0 +1,1027 @@
+#!/bin/bash
+#
+#give a list of macs, neighbourhood discover each one of them then nodeq it
+#
+#11/10/2015 add reboot counter for each mac
+#11/17/2015 add el read; seperate printf function, device type
+#11/18/2015 add gmi nic_el_read and save to log file
+#12/14/2015 add getopts for options
+#12/16/2015 add looping
+#01/20/2016 fxied event log download issue
+#02/12/2016 fixed event log logic
+#03/30/2016 add GPIO and Serial test
+#03/31/2016 add rssi and echo
+#04/08/2016 add clear rssi to get fresh data each time to get rssi
+#04/13/2016 add reboot counter logging and modified date time format
+#04/14/2016 add device type to reboot counter logging,
+#	    add handling for Request timed out
+#	    modify FirstRun parameters so it makes more sense
+#04/26/2016 change net_mgr path
+#05/20/2016 add AP ping test
+#05/25/2016 add macID size checking
+#07/01/2016 add ignore comments in macIDs
+#07/11/2016 add option 'get CRC'
+#07/12/2016 add timer option
+#07/19/2016 add option verify FW signatures
+#07/29/2016 add battery status
+#08/02/2016 remove GetMeterState
+#           add Get event log continously
+#08/03/2016 add Debug mode
+#           fix Get event log
+#08/08/2016 fix last gasp polling logic
+#08/12/2016 fix GPIO output display
+#08/13/2016 add ipv6 pinging w/ auto scale down and w/ four types of patterns: 00, ff, aa, 55
+#           add serial port w/ telnet
+#           fix ipv6 report
+#08/21/2016 seperate eth and ota ipv6 arrays
+#08/24/2016 add comments for ethernet ping
+#11/3/2016  fix battery status get from 9/2/2016 changes
+#11/19/2016 minor fix of $LINE to $line in "[ "${line:0:1}" = "#" ] && continue"
+#11/24/2016 add sleep after neigh discover
+#12/2/2016  change gmi nic_el_read to el_data read; meter_el_state to el_data range
+#12/5/2016  add line break between battery status.
+
+ver="2016.12.5-13.55"
+
+GetMeterElState=0
+GetLastGaspLog=0
+GetEventLog=0
+event_log_loop_timer=3600
+GetLoop=0
+GetRebootLog=0
+TestGPIO=0
+GPIO_loop_timer=3600 #default test GPIO every 1 hr
+GpioW="ota" #default Gpio get method is set to OTA, other method includes eth%x
+TestSerial=0
+SerialW="ota" #default Seiral port is tested in mutt mode, using self loop back plug
+Serial_loop_timer=3600 #default test Serial port every 1 hr
+TestEcho=0
+GetRSSI=0
+SleepTimer=60
+ClearRssi=0
+GetAPing=0
+GetCRC=0
+GetSig=0
+GetBatteryStatus=0
+GetPing=0
+MaxEthPacketSize=8192
+debug=0
+
+
+
+
+# set parameter to 1 to start fresh log file
+GpioFirstRun=0
+SerialFirstRun=0
+EchoFirstRun=0
+RssiFirstRun=0
+
+
+
+while getopts "leLgI:S:ErcPCht:sbvp:D" opt; do
+	case "$opt" in
+	l) GetLastGaspLog=1
+       echo "- Get Last Gasp Log was triggered!"
+	   ;;
+	e) GetEventLog=1
+       echo "- Get Event Log was triggered!"
+	   ;;
+	L) GetLoop=1 
+ 	   echo "- Looping is On"
+	   ;;
+	I) GpioW=${OPTARG}
+       TestGPIO=1 
+	   echo "- Test GPIO (Bridge only): " $OPTARG
+	   ;;
+	S) SerialW=${OPTARG}
+       TestSerial=1
+	   echo "- Test Serial Port (Bridge only - requires MUTT or Ethernet):"	$OPTARG
+	   ;;
+	E) TestEcho=1
+	   echo "- Test Echo"
+	   ;;
+	r) GetRSSI=1
+	   echo "- Get Rssi"
+	   ;;
+	c) ClearRssi=1
+	   echo "- Clear Rssi"
+	   ;;
+    P) GetAPing=1       
+       echo "- Test AP Ping"
+       ;;
+    C) GetCRC=1
+       echo "- Test FW CRC"
+       ;;
+    t) SleepTimer=${OPTARG}
+       echo "- Set looop timer(secs):" $OPTARG>&2
+       ;;
+    s) GetSig=1
+       echo "- Get FW Signatures"
+       ;;
+    b) GetBatteryStatus=1
+       echo "- Get Battery Status (AP/Relay only)"
+       ;;
+    p) PingW=${OPTARG}
+       GetPing=1
+       echo "- Get IPv6 Ping: " $OPTARG
+       ;;
+ 	g) GetRebootLog=1
+	   echo "- Recording Reboot count and device type"
+	   ;;
+    D) debug=1
+       echo "- Debug mode"
+       ;;
+    h)
+       printf "Avaliable options:
+ -m Get Meter El State (for Meter NIC)
+ -l Get Last Gasp Log (for Meter NIC)
+ -e Get Event Log (for Meter NIC)
+ -L Looping 
+ -g Log reboot counter and device type
+ -I (Capital I) Test GPIO, use '-I ethx' to test GPIO via ethernet, 
+    use ifconfig to find the right ethx (Bridge only)
+ -S (Capital S) Test serial port 0 and 1 (Bridge only, requires MUTT)
+ -E Test ECHO
+ -r Get RSSI
+ -P (Capital P) Test AP ping (require modem to be working)
+ -p Test ipv6 ping, must specific interface 
+    i.e. eth0, or eth1, etc, type ifconfig to find out
+ -C Get FW CRC
+ -t n (set loop timer, default is 60seconds
+ -s Get FW signatures (more stringent than CRC)
+ -b Get Battery status (AP/Relay only)
+
+Examples:
+ 1. logging reboot count for every 10secs for list of mac IDs in macIDs
+    \$ macDisc -Lg -t 10 macIDs.log
+
+ 2. To test GPIOs over the air:
+    \$ macDisc -I 'ota' macIDs    
+    To test GPIOs using ethernet (also see note 1):
+    \$ macDisc -I 'eth5' macIDs
+    
+ 3. To test Serial port in MUTT mode using self loop back check:
+    \$ macDisc -S 'ota' macIDs    
+    To test Serial port in Production mode (also see note 1 and 2):
+    \$ macDisc -S 'eth5' macIDs
+
+ 4. Typical Bridge testing in production mode:
+    (Test Serial port, GPIOs, ipv6 pinging, get reboot, rssi and 
+    loop every 120secs for a list of macs)
+    \$ macDisc -S 'eth5' -I 'eth6' -p 'eth5' -Lgr -t 120 macIDs
+
+Note:
+    *1: \"eth5\" is the ethernet interface. Your enivornment may be different, 
+        use \"ifconfig\" to find your eth interface.
+    *2: require ethernet avalaible and telnet
+
+Version: $ver\n"
+        exit 0
+       ;;
+	\?)
+ 	   echo "Invalid options: -$OPTARG"
+       exit 1
+	   ;;
+	esac
+done
+
+shift "$((OPTIND -1 ))"
+
+
+if [ $# -eq 0 ];then
+    printf "Missing argument or wrong options.\nType 'macDisc -h' for a list of options and examples\n"
+    printf "%sVersion: $ver%s\n" '---' '---'
+	exit 1
+fi
+
+
+
+NETMGR=/home/ssnuser/work/net_mgr
+SERIALPORT=/home/ssnuser/work/serialPort
+t1=0
+chars="/-\|"
+sc=0
+
+GetImage() {
+    local inputMac=$1
+    local fw0='some fw'
+    local fw1='some fw'
+    
+    fw0=$($NETMGR -g -d $inputMac -t 8 image list | grep '#0' | awk '{printf $3}')
+    fw1=$($NETMGR -g -d $inputMac -t 8 image list | grep '#1' | awk '{printf $3}')
+
+    echo "$fw0 $fw1"
+}
+
+GetElState() {
+    local inputMac=$1
+    local st
+    local cfs=0
+    local cls=0
+    # cfs - current first sequence, cls - current last sequence
+
+    # function return event log first sequence and last sequence
+    
+    #the following works for meter NICs but not for Ap/Relay
+    #st=$($NETMGR -g -d $inputMac meter_el_state | sed 's/[^0-9]//g') 
+    #cfs=$(echo $st | awk {'printf $1'})
+	#cls=$(echo $st | awk {'printf $2'})
+
+    #the following works for Ap/Relay, not sure for Meter NICs
+    st=$($NETMGR -g -d $inputMac el_data range | sed 's/[^0-9]//g')
+	cls=$(echo $st | awk {'printf $1'}) #max seq
+	cfs=$(echo $st | awk {'printf $2'}) #min seq
+    echo "$cfs $cls"
+}
+
+ReadEL() {
+    local inputMac=$1
+    local cFS=$2
+    local cLS=$3
+    local logtype=${4:-0} #el or lg (event log is 0, last gasp is 1)
+    local rFS="$cFS"
+    local rLS=0
+    local logfile="event_log_${macAndIps["$item"]}.txt"
+
+    if [[ $logtype == 1 ]]; then
+        local lglogfile="last_gasp_${macAndIps["$item"]}.txt"
+    fi
+
+    if [[ $logtype == 0 ]]; then
+        n=0
+        m=0
+        i=30
+
+        let "TotalLogs=$cLS-$cFS" #get total log entries
+        let "m=$TotalLogs/$i"	#divide into n parts
+
+        while (( $n <= $m ))
+        do
+            # the last squence to be read, is equal to the first sequence + i entries
+            # i.e. if want to read sequence 10 to 105, then the first time read will be from 10 to 40
+            # next read will be from 41 to 71 and so on. 
+            # The reason is nic_el_read can only read so many logs at once depending on the size of each event entries. 
+            # 30 is randomly selected for best practice.
+            # reading from 10 to 105 entries (assume nic event log entries range from 0 to 200, we only want range 10 to 105)
+            # TotalLogs: 95
+            # m:         3
+            # cFS:      10
+            # rFS:     105
+            # i:        30
+            # n     0    1     2     3 
+            # rFS  10   41    72   103
+            # rLS  40   71   102   105
+
+	        let "n=$n+1"	# 1, 2, 3, 4
+	        let "rLS=$rFS+i" # 40, 71, 102, 133
+            
+            #for debug
+            if [[ $debug == 1 ]]; then printf "n:$n, m:$m, rFS:$rFS, rLS:$rLS, cFS:$cFS, cLS:$cLS\n"; fi
+	
+	        if (( $rLS > $cLS )); then # if rLS is 133, then rLS is set to cLS 105
+                if [[ $debug == 1 ]]; then printf "rLS ($rLS) > cLS ($cLS)\n"; fi
+		        let "rLS=$cLS"
+                let "n=$n+1"
+	        fi
+
+            #if [ "$logtype" = "el" ] ; then
+            # the following works for meter NICs, but not AP/Relay
+        	#$NETMGR -g -d $item gmi nic_el_read "$rFS":"$rLS" >> "$logfile"
+            # the following works for AP/Relay, not sure for meter NICs
+            $NETMGR -g -d $item el_data read "$rFS" "$rLS" >> "$logfile"
+            #else if [ "$logtype" = "lg" ] ; then
+        	#    $NETMGR -g -d $item last_gasp "$rFS":"$cLS" >> "$logfile"
+            #fi
+            # 10:40
+            # 41:71
+            # 72:102
+            # 103:105
+
+	        #read i entries at a time
+	        let "rFS=rLS+1" # 41, 72, 103, 106
+
+        done
+    fi
+}
+
+
+#begin of while loop
+while true;do
+
+listIPv6=() #used by ota
+listmacid=() #used by ota and eth
+unset macAndIps
+declare -A macAndIps
+macNotFound=() # used by ota
+listIPv6NotFound=() #used by ota
+
+listIPv6eth=() #used by eth
+macEthNotFound=() #used by eth
+listIPv6ethNotFound=() #used by eth
+
+if [[ "$PingW" = *"eth"* ]]; then
+    ethIf=$PingW
+elif [[ "$SerialW" = *"eth"* ]]; then
+    ethIf=$SerialW
+elif [[ "$GpioW" = *"eth"* ]]; then
+    ethIf=$GpioW
+else
+    ethIf=0
+fi
+
+date
+
+    while IFS='' read -r line || [[ -n "$line" ]]; do
+        #while IFS= read -r line; do
+        if [[ $debug == 1 ]]; then printf $line; fi
+        [ "${line:0:1}" = "#" ] && continue
+        size=${#line}	    
+        if [ $size -eq 16 ]; then #each mac ID is 16 characters long, anything short than that will be discarded
+
+	        #echo "macs: $line"
+	        listmacid+=("$line")
+
+	        # convert mac id 0013501234567890 to 00:13:50:12:34:56:78:90
+	        macid1=$(echo $line | sed "s/.\{2\}/&:/g" | sed "s/:$//" | sed -e "s/\(.*\)/\L\1/")
+
+	        # convert mac id 0013501234567890 to 00.13.50.12.34.56.78.90
+	        macid2=$(echo $line | sed "s/.\{2\}/&./g" | sed "s/.$//" | sed -e "s/\(.*\)/\L\1/")
+
+	        # convert mac id 0013501234567890 to fe80::213:5012:3456:7890	
+	        ipv6=$(echo $line | sed "s/\.//g" | sed "s/....\B/&:/g" | sed "s/^../fe80::2/" | sed "s/\(.*\)/\L\1/")
+
+	        # map ipv6 to macid for use to save filenames
+	        macAndIps["$ipv6"]="$line"
+	
+            # ota test
+	        found=0
+	        $NETMGR -i mlme_disc_mac $macid1 &> /dev/null
+            sleep 2
+	        $NETMGR -i nodeq 0 | grep -q $macid2 && found=1
+
+
+	        if [ "$found" = 1 ]; then
+		
+		        #printf "Attempt to communicate with %s\n" $ipv6
+		        #bootcounter=$($NETMGR -g -d $ipv6 conf mlme mlme_reboot_cntr | sed 's/[^0-9]//g')
+		
+		        boot_msg=$($NETMGR -g -d $ipv6 conf mlme mlme_reboot_cntr 2>&1)
+	
+		        if [ "$boot_msg" != "Request timed out" ]; then 
+
+			        bootcounter=$(echo $boot_msg | grep -oP '\d*')
+			        devicetype=$($NETMGR -g -d $ipv6 sysvar 211 | grep -oP '(?<=DEVTYPE:\s).*')	
+			        devicetype=$(printf "%d" $devicetype)
+
+			        listIPv6+=("$ipv6")
+
+			        printf "%s found in nodeq," "$macid1"
+			        printf " reboot:%4s," "$bootcounter"
+			        printf " dev_typ:%3s," "$devicetype"
+
+			        printf " ipv6:%s"   "$ipv6"
+
+
+			        #echo $ipv6
+			
+		        else	
+			        printf "%s OTA Request timed Out" "$macid1"
+			        macNotFound+=("$macid1") # macs not in fsu nodeq goes in this list.
+			        listIPv6NotFound+=("$ipv6") # ipv6 not in fsu nodeq goes in this list.
+		        fi # if [ "$boot_msg" != "Request timed out" ]; then 
+	        else
+		        printf "%s NOT found in nodeq" "$macid1"
+		        macNotFound+=("$macid1")
+		        listIPv6NotFound+=("$ipv6")
+	        fi # end of if [ "$found" = 1 ]; then
+
+
+            # ethernet test if any test requires ethernet
+            if [[ "$ethIf" = *"eth"* ]]; then
+                #printf "\nQuick ping6 test for %s\n" $ipv6
+                # easy ping test to find out if ethernet works or not for this mac
+                ipv6int=$ipv6'%'$ethIf
+                #printf "ipv6int: %s\n" $ipv6int
+                rec=$(ping6 $ipv6int -c 1 -W 1 | grep received | awk '{printf $4}')
+                #printf "rec is::::: %s\n" $rec
+
+                if [[ $rec == 1 ]]; then #ping is Ok
+                    boot_msg=$($NETMGR -d $ipv6int conf mlme mlme_reboot_cntr 2>&1)
+                    #printf "ipv6: %s\n" $ipv6
+                    
+                    if [ "$found" != "Request timed out" ]; then 
+
+			            bootcounter=$(echo $boot_msg | grep -oP '\d*')
+			            devicetype=$($NETMGR -d $ipv6int sysvar 211 | grep -oP '(?<=DEVTYPE:\s).*')	
+			            devicetype=$(printf "%d" $devicetype)
+                        
+			            listIPv6eth+=("$ipv6")
+
+                        if [ "$found" == 0 ]; then # if OTA failed, send message showing the reboot/dev_typ/ipv6 received via ethernet
+			                printf " Found with ethernet"
+			                printf " reboot:%4s," "$bootcounter"
+			                printf " dev_typ:%3s," "$devicetype"
+			                printf " ipv6:%s"   "$ipv6"
+                        else # if OTA didn't fail, then send message saying eth_ping is ok
+                            printf " eth_ping: Ok"
+                        fi
+
+			            #echo $ipv6
+			
+		            else	
+			            printf "%s Eth failed" "$macid1"
+			            macEthNotFound+=("$macid1") # macs not in fsu nodeq goes in this list.
+			            listIPv6ethNotFound+=("$ipv6") # ipv6 not in fsu nodeq goes in this list.
+                    fi # end of if [ "$boot_msg" != "Request timed out" ]; then 
+                    
+		        fi # end of if [[ $rec == 1 ]]; then
+
+            fi # end of if [[ "$ethIf" = *"eth"* ]]; then
+            printf "\n"
+        fi	# end of if [ $size -eq 16 ]; 
+        done < "$1" # end of while IFS='' read -r line || [[ -n "$line" ]]; do
+
+
+
+        # getting last gasp logs based on Total record count
+        if [ "$GetLastGaspLog" = 1 ]; then
+            printf "\n...Last Gasp..................\n"
+	        for item in "${listIPv6[@]}"
+	        do
+		        lastGaspRecord=$($NETMGR -g -d $item last_gasp stat | grep total | sed 's/[^0-9]//g')
+		        printf "%s: Last Gasp records count: %d, retrieving......" $item $lastGaspRecord
+
+                logfile="last_gasp_${macAndIps["$item"]}.txt"
+
+                #check if event log file already exists:
+                if [ -e "$logfile" ]; then
+                    fLS=$(tac "$logfile" | grep -m 1 "Record #" | grep -Eo "[0-9]*")
+                    if [[ $debug == 1 ]]; then printf "fLS: $fLS\n"; fi
+                    if [[ $fLS > $lastGaspRecord ]]; then
+                        # if the existing last gasp record sequence is bigger than what's in the NIC
+                        # it is likly the NIC has been reflashed and the record seq number was reset
+                        # in which case, continue to pull last gasp records
+                        let n=0
+                    else
+                        let n=$fLS+1
+                    fi
+                else
+                    let n=0
+                fi
+                if [[ $debug == 1 ]]; then printf "fLS: $fLS, n:$n lastGaspRecord:$lastGaspRecord\n"; fi
+	            while [ $n -le $lastGaspRecord ]
+	            do
+		            $NETMGR -g -d $item last_gasp any_rec $n >> $logfile
+                    #echo -ne "$n\r"
+                    printf '\b\b\b\b\b%5d' $n
+                    let n=$n+1
+		            # test hash table: using ipv6 to get macid
+		            #echo $item
+		            #echo ${macAndIps["$item"]}
+	            done
+                #kill "$!"
+		        printf "\n"
+	        done
+        fi
+
+
+        # getting event logs continously
+        if [ "$GetEventLog" = 1 ]; then
+        t0=$(date +%s)
+        printf "\n...Event Logs.................\n"
+        if [[ $t0 > $t1 ]]; then
+            for item in "${listIPv6[@]}"
+            do            
+                let t1=$t0+$event_log_loop_timer
+                
+                        
+                cFS=0 #cFS, cLS, current sequences from NIC
+                cLS=0
+                rFS=0 #rFS, rLS, sequences to be read
+                rLS=0
+                fLS=0 #fLS, the last sequence from log file
+
+                logfile="event_log_${macAndIps["$item"]}.txt"
+
+                #get current first and last sequence 
+                read cFS cLS < <(GetElState $item)
+                #debug
+                if [[ $debug == 1 ]]; then printf "NIC event log seq range (cFS to cLS): $cFS to $cLS\n"; fi
+                let rLS=$cLS
+
+                #check if event log file already exists:
+                if [ -e "$logfile" ]; then
+                    # last sequence from existing log file
+                    fLS=$(tac "$logfile" | grep -m 1 '  seq' | awk '{printf $2}' | sed 's|,||g')
+                    #debug
+                    if [[ $debug == 1 ]]; then printf "event log file last sequence (fLS) is $fLS\n"; fi
+                    let fLS=$fLS+0 # if there is none, then set the last sequence from file to 0
+
+                    if [[ $cLS > $fLS ]]; then #event log sequence from NIC is > from file
+                        let rFS=$fLS+1 # set sequence to be read to last sequence from file + 1
+                        ReadEL $item $rFS $rLS
+
+                    elif [[ $fLS > $cLS ]]; then # if for some reason, the event log sequence from file is > from NIC, then read from the beginning
+                        let rFS=$cFS # set sequence to be read to first sequence from NIC
+                        ReadEL $item $rFS $rLS
+
+                    elif [[ $fLS == $cLS ]]; then # if event log sequence from file is == from NIC, then do not do anything
+                        continue
+                    fi
+                else
+                    # event log doens't exist, then read from first sequence to last sequence, 30 entries at a time.
+                    let rFS=$cFS
+                    ReadEL $item $rFS $rLS    
+                fi
+                printf "$item, first seq: $rFS, last seq: $rLS\n"
+            done
+            else
+                printf "%s secs until next Event Log check\n" $[t1-t0]
+        fi
+        printf "\n"
+        fi
+
+
+        #Get IPv6 ping
+        if [[ "$GetPing" == "1" ]]; then
+	        printf "\n...Get IPv6 Ping...................\n"
+            if [[ "$PingW" = *"eth"* ]]; then                    
+                printf "%-4s %-4s %-4s %-4s %-4s %-4s %-4s %-4s\n" "Time" "mac" "eth" "result" "packet size" "pattern" "received" "min avg max mdev"
+	            for item in "${listIPv6eth[@]}"
+	            do
+                    ipv6=$item'%'$PingW # use this to talk to UUT via ethernet
+                    patternArray=($(echo "00 ff 55 aa" | tr " " "\n" | shuf | tr -d "\d")) # create a pattern array, but have random pattern sequence
+
+                    for pattern in ${patternArray[@]};do
+                        
+                        packetS=$MaxEthPacketSize
+                        nextping=1
+
+                        while [[ "$nextping" == "1" && "$packetS" > "0" ]]; 
+                        do
+			                pingresult=$(ping6 $ipv6 -q -s $packetS -c 1 -W 1 -p $pattern 2>&1)
+                            #echo "$pingresult"
+                            packetForPing=$packetS
+                            rec=$(echo "$pingresult" | grep received | awk '{printf $4}') # if ping is good, get 1, if not, 0
+
+                            if [[ $rec == 1 ]]; then
+                                result='Pass'         
+                                rtt=$(echo "$pingresult" | grep rtt | grep -oE '[0-9]*\.[0-9]*' | sed ':a;N;$!ba;s/\n/, /g') # getting rtt values                        
+                                nextping=0 # ping is good, no need to ping next packet size
+                                #printf "Received: %s " $rec
+                                #printf "rtt: $rtt\n"
+                            else
+                                rtt="0, 0, 0, 0"
+                                result='Fail'
+                                let "packetS=$packetS/2"
+                            fi
+
+                            
+		                    datetime=$(date +%Y-%m-%d,%H:%M:%S)
+    	                    printf "%19s, %24s, %4s, %4s, %4s, %2s, %1s, %6s %6s %6s %6s \n" $datetime $item $PingW $result $packetForPing $pattern $rec $rtt | tee /dev/tty |tee >> "ping6_log_${macAndIps["$item"]}.txt"
+
+                        done # end of while loop
+                    done # end of for loop 
+	            done # end of 'or item in "${listIPv6[@]}"'
+
+            else
+                printf "Unknown ethernet interface: %s\n" $PingW                
+            fi # end of 'if [[ "$PingW" = *"eth"* ]]; then'
+        fi # end of 'if [ "$GetPing" = 1 ]; then'
+
+
+        #GPIO test
+        if [ "$TestGPIO" = 1 ]; then
+            
+            # decide which array to use:
+            if [ $GpioW == 'ota' ]; then
+                ipArray=("${listIPv6[@]}") 
+            else
+                ipArray=("${listIPv6eth[@]}")
+            fi
+
+            t0=$(date +%s)
+            printf "\n...GPIO Test...................\n"
+            if [[ $t0 > $t_gpio_1 ]]; then
+                let t_gpio_1=$t0+$event_log_loop_timer                
+                for item in "${ipArray[@]}"
+                do
+                    if [[ $debug == 1 ]]; then printf "GpioW: %s\n" $GpioW; fi
+	                # unset GPIOout
+	                # unset GPIOin
+	                # declare hush table for output combinations and their expected result at the input
+                    if [ "$GpioW" = 'ota' ]; then
+                        useEth=0
+                        timeout=5
+                        printf "Testing GPIO Over-The-Air\n"
+                    elif [[ $GpioW == *'eth'* ]]; then
+                        useEth=1
+                        timeout=1
+                        ip=$item'%'$GpioW # use this to talk to UUT via ethernet
+                        printf "Testing GPIO using ethernet interface: %s\n" $GpioW
+                        if [[ $debug == 1 ]]; then printf printf "ipv6: %s\n" $ip; fi                        
+                    else
+                        printf "Un recongized option [%s], test with OTA instead\n" $GpioW
+                        useEth=0
+                    fi
+
+                    #printf "Using Ethernet: %d\n" $useEth
+                    #eth='%eth6'
+                    
+                    
+	                declare -A GPIOout=( ["1"]="0x0002" 
+			                ["2"]="0x0008" 
+			                ["3"]="0x0020" 
+			                ["4"]="0x0080" 
+			                ["12"]="0x000a" 
+			                ["13"]="0x0022" 
+			                ["14"]="0x0082" 
+			                ["23"]="0x0028" 
+			                ["24"]="0x0088"
+			                ["34"]="0x00a0"
+			                ["123"]="0x002a"
+			                ["124"]="0x008a"
+			                ["134"]="0x00a2"
+			                ["234"]="0x00a8"
+			                ["1234"]="0x00aa"
+			                )
+
+	                declare -A GPIOin=(["1"]="0x0001"
+			                 ["2"]="0x0004"
+			                ["3"]="0x0010" 
+			                ["4"]="0x0040"
+			                ["12"]="0x0005"
+			                ["13"]="0x0011"
+			                ["14"]="0x0041"
+			                ["23"]="0x0014"
+			                ["24"]="0x0044"
+			                ["34"]="0x0050"
+			                ["123"]="0x0015"
+			                ["124"]="0x0045"
+			                ["134"]="0x0051"
+			                ["234"]="0x0054"
+			                ["1234"]="0x0055"
+			                )
+
+                        printf "%s\n" $item
+
+	                datetime=$(date +%Y-%m-%d,%H:%M:%S)        
+	                echo $datetime | tee /dev/tty | tee >>  "gpio_log_${macAndIps["$item"]}.txt"
+	                echo "Using ethernet" $useEth | tee >>  "gpio_log_${macAndIps["$item"]}.txt"
+
+	
+	                #=================Begin of another 'for' loop====================
+	                for io_name in "${!GPIOout[@]}"
+	                do 
+		
+		                # output port to turn on
+		                Output_port=${GPIOout["$io_name"]}
+
+		                # expected value from input port
+		                Expected_input_value=${GPIOin["$io_name"]}
+
+		                #echo $io_name
+		                #echo $output_port
+		                #echo $input_value
+		
+		
+		                #GpioMessage=$($NETMGR -g -d $item -t 3 iso_gpio show)
+                        #GpioMessage=$($NETMGR -d $item -t 3 iso_gpio show)
+		                #echo $GpioMessage
+
+		                # InputState1=$(echo $GpioMessage | grep 'Input state' | sed -r 's/.*(0x)/\1/g')
+		                # OutputState1=$(echo $GpioMessage | grep 'Output state:' | sed -r 's/.*(0x)/\1/g')
+		
+		                # for debug
+		                # echo $InputState1
+		                # echo $OutputState1		
+		                # printf "output port %s\n" $output_port
+		                # printf "input value expected %s\n" $input_value
+	                    # sleep 1
+                        if [ "$useEth" = 1 ]; then
+                    		SetOutput=$($NETMGR -d $ip -t $timeout iso_gpio set output_pin:$Output_port 2>&1)
+                    		GpioMessage=$($NETMGR -d $ip -t $timeout iso_gpio show 2>&1)		
+                        else
+                            SetOutput=$($NETMGR -g -d $item -t $timeout iso_gpio set output_pin:$Output_port 2>&1)
+                            GpioMessage=$($NETMGR -g -d $item -t $timeout iso_gpio show 2>&1)		
+                        fi		
+
+		                # extract input state and output state from GpioMessage output
+                        InputState=$(echo $GpioMessage | grep -Po '(?<=Input state:\s).*(?=\sOutput state:)')
+		                OutputState=$(echo $GpioMessage | grep -Po '(?<=Output state:\s).*')
+
+		                # printf "%s %s \n" $InputState $Expected_input_value #$GpioMessage
+	
+		                if [ "$InputState" = "$Expected_input_value" ]; then
+			                result='Pass'
+		                elif [ "$GpioMessage" = "Erroneous request" ]; then
+			                result=$(echo 'Fail - Bad request') #$GpioMessage)
+		                else
+			                result='Fail - Wrong input state; expecting: '$Expected_input_value
+                            #echo $GpioMessage
+		                fi
+
+	
+		                if [ "$GpioFirstRun" = 1 ]; then
+		                         rm "gpio_log_${macAndIps["$item"]}.txt"
+		                         GpioFirstRun=0
+		                fi
+		
+		                echo $Output_port " --- " $InputState $result | tee /dev/tty | tee >> "gpio_log_${macAndIps["$item"]}.txt"
+		                #echo " " >> "gpio_log_${macAndIps["$item"]}.txt"
+	
+	                done
+	                #=================end of another 'for' loop====================
+
+	                # turn off all output at end of test
+                    if [ "useEth" = 1 ]; then
+                    	SetOutput1=$($NETMGR -d $ip -t $timeout iso_gpio set output_pin:0x0000) 
+                    else
+                        SetOutput1=$($NETMGR -g -d $item -t $timeout iso_gpio set output_pin:0x0000) 
+                    fi
+
+                done # end of 'for item in "${listIPv6[@]}"'
+
+                printf "Finished GPIO test, next test after %s secs\n" $GPIO_loop_timer
+                
+                else
+                    printf "%s secs until next GPIO test\n" $[t_gpio_1-t0]
+
+            fi # end of 'if [[ $t0 > $t_gpio_1 ]]; then'
+
+        fi # end of 'if [ "$TestGPIO" = 1 ]; then'
+
+
+        #Serial test
+        if [ "$TestSerial" = 1 ]; then
+            printf "\n...Serial Test...................\n"
+
+            # decide which array to use:
+            if [[ "$SerialW" = "ota" ]]; then
+                ipArray=("${listIPv6[@]}") 
+            else
+                ipArray=("${listIPv6eth[@]}")
+            fi
+            
+            printf "%-19s  %-24s  %-4s %-4s %-4s\n" "Time" "Mac" "Mode" "port0" "port1"    
+            for item in "${ipArray[@]}"          
+            do
+                #printf "%s\n" $item
+                if [[ "$SerialW" = *"eth"* ]]; then
+                    #printf "serialW is: %s\n" $SerialW
+                    #printf "Testing Serial port with ethernet and Telnet\n"
+                    if [ -e "$SERIALPORT" ]; then
+                        ipv6=$item'%'$SerialW # use this to telnet to serial port 2001 and 2002
+                        
+                        # there are two serial ports, they must be configured as rawu, tcp and 2001/2002 for port0/por1
+                        # the script $SERIALPORT sends string '...testing...' to the port and if all goes well, the same string will echo back
+                        # if test successful, port0 and port 1 should return 2, otherwise 1 which inicates a fail
+
+                        port0=$($SERIALPORT $ipv6 2001 2>&1 | grep -c ...testing...)
+                        port1=$($SERIALPORT $ipv6 2002 2>&1 | grep -c ...testing...)
+
+                        [[ $port0 = 2 ]] && port0="Pass" || port0="Fail"
+                        [[ $port1 = 2 ]] && port1="Pass" || port1="Fail"
+
+                        #datetime=$(date +%Y-%m-%d,%H:%M:%S)
+                        #printf "%-19s, %-29s, %-4s, %-4s, %-5s\n" $datetime $item $SerialW $port0 $port1 | tee /dev/tty | tee >> "serial_log_${macAndIps["$item"]}.txt"         
+
+                    else
+                        printf '%s does not exist, can not test serial port with ethernet and Telnet' $SERIALPORT
+                    fi # enf of 'if [ -e "$SERIALPORT" ]; then'
+
+                elif [ "$SerialW" = 'ota' ]; then
+                    port0=$($NETMGR -g -d $item uart loopback_test 0:0 | grep - | sed -r 's/[0-1] - //g')
+                    port1=$($NETMGR -g -d $item uart loopback_test 1:1 | grep - | sed -r 's/[0-1] - //g')
+                    
+                    # test if variable are empty
+                    [[ -z $port0 ]] && port0="Fail" 
+                    [[ -z $port1 ]] && port1="Fail" 
+                    
+                    
+                
+                else
+                    printf "Un recongized option [$s]\n" $SerialW
+                    exit 1
+                fi # end of 'if [[ "$SerialW" = *"eth"* ]]; then'              
+
+                datetime=$(date +%Y-%m-%d,%H:%M:%S)	
+                printf "%-19s, %-24s, %-4s, %-4s, %-5s\n" $datetime $item $SerialW $port0 $port1 | tee /dev/tty | tee >> "serial_log_${macAndIps["$item"]}.txt"                                 
+
+            done # end of 'for item in "${listIPv6[@]}"'
+
+        fi # end of 'if [ "$TestSerial" = 1 ]; then'
+
+
+
+        #ECHO Test
+        if [ "$TestEcho" = 1 ]; then
+        printf "\n...ECHO Test...................\n"
+        for item in "${listIPv6[@]}"
+        do
+	        byte_stream=255
+
+                printf "%s\n" $item
+
+	        if [ "$EchoFirstRun" = 1 ]; then
+		        rm "echo_log_${macAndIps["$item"]}.txt"
+		        EchoFirstRun=0
+	        fi
+
+	        datetime=$(date +%Y-%m-%d,%H:%M:%S)
+                echo $datetime | tee /dev/tty | tee  >> "echo_log_${macAndIps["$item"]}.txt"
+                $NETMGR -g -d $item echo $byte_stream | tee /dev/tty | tee >> "echo_log_${macAndIps["$item"]}.txt"
+	        echo " " >> "echo_log_${macAndIps["$item"]}.txt"
+
+
+        done
+        fi
+
+        #Clear RSSI
+        if [ "$ClearRSSI" = 1 ]; then
+        printf "\n...Clear RSSI...................\n"
+        for item in "${listIPv6[@]}"
+        do
+                printf "%s\n" $item
+
+		        $NETMGR -g -d $item chanstats clear
+
+        done
+        fi
+
+        #Get RSSI
+        if [ "$GetRSSI" = 1 ]; then
+        printf "\n...Get RSSI...................\n"
+        for item in "${listIPv6[@]}"
+        do
+            printf "%s\n" $item
+	
+	        # add 4/8/2016 - clear rssi each time to get fresh data
+	        $NETMGR -g -d $item chanstats clear
+	
+	        datetime=$(date +%Y-%m-%d,%H:%M:%S)	
+            echo $datetime | tee /dev/tty | tee  >> "rssi_log_${macAndIps["$item"]}.txt"
+	        $NETMGR -g -d $item chanstats >> "rssi_log_${macAndIps["$item"]}.txt"
+	        echo " " >> "rssi_log_${macAndIps["$item"]}.txt"
+
+        done
+        fi
+
+
+        # AP modem ping 8.8.8.8 google 5/19/2016
+        if [ "$GetAPing" = 1 ]; then
+        printf "\n...AP Modem ping 8.8.8.8.................\n"
+        for item in "${listIPv6[@]}"
+        do
+                printf "%s\n" $item
+
+	
+	        datetime=$(date +%Y-%m-%d,%H:%M:%S)	
+            #echo $datetime | tee /dev/tty | tee  >> "ping_log_${macAndIps["$item"]}.txt"
+            pingcommand='ping'
+
+            # sending ping
+	        SendPing=$($NETMGR -g -d $item $pingcommand start 8.8.8.8 10 100 256)
+            sleep 1
+            #echo 'SendPing ... '$SendPing
+
+            # get ping result
+            PingResult=$($NETMGR -g -d $item ping list)
+            TxPacket=$(echo $PingResult | grep -Po '(?<=\s[NY]\s)\d{1,3}(?=\s.*)')
+            pattern='(?<=\s[NY]\s'$TxPacket'\s)\d{1,3}(?=\s.*)'
+            RxPacket=$(echo $PingResult | grep -Po $pattern)
+            #echo 'PingResult ... '$PingResult
+            printf 'Sent: '$TxPacket', Received: '$RxPacket'\n\n'
+
+
+            # log ping result    
+	        echo $datetime',' $TxPacket',' $RxPacket >> "aping_log_${macAndIps["$item"]}.txt"
+            
+            # clear ping log
+            $NETMGR -g -d $item ping clear &> /dev/null
+
+        done
+        fi # end of 'if [ "$GetPing" = 1 ]; then'
+
+
+        #Get CRC
+        if [ "$GetCRC" = 1 ]; then
+	        printf "\n...Get FW CRC...................\n"
+	        for item in "${listIPv6[@]}"
+	        do
+		        #printf "%s\n" $item
+	          
+		        #date >> "reboot_log_${macAndIps["$item"]}.txt"
+                read fw0 fw1 < <(GetImage $item)
+                #printf "fw0 is: %s\n" $fw0
+                #printf "fw1 is: %s\n" $fw1
+		        crcresult1=$($NETMGR -g -d $item -t 8 image image_crc $fw0 2>&1 | awk '{printf $6}')
+		        crcresult2=$($NETMGR -g -d $item -t 8 image image_crc $fw1 2>&1 | awk '{printf $6}')
+
+			
+		        datetime=$(date +%Y-%m-%d,%H:%M:%S)
+		        echo "$datetime, $item, $fw0, $crcresult1, $fw1, $crcresult2" | tee /dev/tty |tee >> "crc_log_${macAndIps["$item"]}.txt"
+
+	        done
+        fi
+
+        #Get Signatures
+        if [ "$GetSig" = 1 ]; then
+	        printf "\n...Get FW Signatures...................\n"
+	        for item in "${listIPv6[@]}"
+	        do
+		        #printf "%s\n" $item
+	          
+		        #date >> "reboot_log_${macAndIps["$item"]}.txt"
+                read fw0 fw1 < <(GetImage $item)
+                #printf "fw0 is: %s\n" $fw0
+                #printf "fw1 is: %s\n" $fw1
+		        result0=$($NETMGR -g -d $item -t 12 image image_verify_signatures $fw0 2>&1)
+                prodkey0=$(echo "$result0" | grep 'prod key:' | awk {'printf "%s %s", $4, $5'})
+                DEVkey0=$(echo "$result0" | grep 'DEV key:' | awk {'printf "%s %s", $4, $5'})
+                TSTkey0=$(echo "$result0" | grep 'TST key:' | awk {'printf "%s %s", $4, $5'})
+
+                sleep 1
+		        result1=$($NETMGR -g -d $item -t 12 image image_verify_signatures $fw1 2>&1)    
+                prodkey1=$(echo "$result1" | grep 'prod key:' | awk {'printf "%s %s", $4, $5'})
+                DEVkey1=$(echo "$result1" | grep 'DEV key:' | awk {'printf "%s %s", $4, $5'})
+                TSTkey1=$(echo "$result1" | grep 'TST key:' | awk {'printf "%s %s", $4, $5'})
+			
+		        datetime=$(date +%Y-%m-%d,%H:%M:%S)
+		        echo "$datetime, $item, $fw0, prod0:$prodkey0, DEV0:$DEVkey0, TST0:$TSTkey0, $fw1, prod1:$prodkey1, DEV1:$DEVkey1, TST1:$TSTkey1" | tee /dev/tty |tee >> "sig_log_${macAndIps["$item"]}.txt"
+
+
+	        done
+        fi
+
+        #Get Battery Status
+        if [ "$GetBatteryStatus" = 1 ]; then
+	        printf "\n...Get Battery Status...................\n"
+	        for item in "${listIPv6[@]}"
+	        do
+		        #printf "%s\n" $item
+
+		        batterystatus=$($NETMGR -g -d $item -j battery status 2>&1)
+			
+		        datetime=$(date +%Y-%m-%d,%H:%M:%S)
+                echo $datetime >> "battery_log_${macAndIps["$item"]}.txt"
+		        echo "$batterystatus" | tee -a "battery_log_${macAndIps["$item"]}.txt"
+                echo " " | tee -a "battery_log_${macAndIps["$item"]}.txt" # create line break
+
+	        done
+        fi
+
+
+ 
+
+
+        #Get Reboot
+        if [ "$GetRebootLog" = 1 ]; then
+	        printf "\n...Get Reboot Log...................\n"
+	        for item in "${listIPv6[@]}"
+	        do
+		        #printf "%s\n" $item
+	          
+		        #date >> "reboot_log_${macAndIps["$item"]}.txt"
+		        bootcounter=$($NETMGR -g -d $item conf mlme mlme_reboot_cntr | grep -oP '[0-9]*')
+		        devicetype=$($NETMGR -g -d $item sysvar 211 | grep -oP '(?<=DEVTYPE:\s).*')
+		
+		        devicetype=$(printf "%d\n" $devicetype)	
+			
+		        datetime=$(date +%Y-%m-%d,%H:%M:%S)
+		        echo "$datetime, $item, $bootcounter, $devicetype" | tee /dev/tty |tee >> "reboot_log_${macAndIps["$item"]}.txt"
+
+	        done
+
+	        # add items not found to the log file
+	        for item in "${listIPv6NotFound[@]}"
+	        do
+		        datetime=$(date +%Y-%m-%d,%H:%M:%S)
+		        bootcounter="mac not found"
+		        echo "$datetime, $item, $bootcounter, " | tee /dev/tty |tee >> "reboot_log_${macAndIps["$item"]}.txt"
+	        done
+        fi # end of 'if [ "$GetRebootLog" = 1 ]; then'
+
+    printf "\n....not found in nodeq...........\n"
+    for item in ${macNotFound[@]}
+    do
+        printf " %s\n" $item
+    done
+
+        #printf "\n...Ipv6.......................\n"
+        #for item in ${listIPv6[*]}
+        #do
+	    #    printf " %s\n" $item
+        #done
+
+    if [ $GetLoop -eq 0 ]; then
+        printf "\nGood bye\n"
+        exit 0
+    fi
+
+    printf "\nWait for $SleepTimer seconds\n"
+
+    sleep $SleepTimer
+
+done #end of for loop
+
