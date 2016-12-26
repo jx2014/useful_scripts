@@ -112,7 +112,7 @@ END
 
 
 # AP 5.0 ALT
-#: <<'END'
+: <<'END'
 listMac=(
         "fe80::213:50ff:fe60:05c1" #uut1 #upgraded to 4.0.1
         #"fe80::213:50ff:fe60:05ab" #uut2 removed from chamber
@@ -139,6 +139,37 @@ listMac=(
         "fe80::213:50ff:fe60:05d6" #uut23
         "fe80::213:50ff:fe60:05ac" #uut24
 	  )
+END
+
+#: <<'END'
+listIpv4=(
+	"166.255.223.225" #uut1
+#	"166.161.133.071" #uut2 ethernet
+#	"166.255.223.224" #uut3 ethernet
+#	"166.255.223.218" #uut4 ethernet
+#	"166.255.223.221" #uut5 ethernet
+#	"166.161.133.119" #uut6 ethernet
+#	"166.161.133.114" #uut7 ethernet
+	"166.255.223.231" #uut8
+#	"166.161.133.070" #uut9 removed from chamber 
+#	"166.161.133.113" #uut10 ethernet
+	"166.255.223.227" #uut11
+	"166.255.223.235" #uut12
+	"166.255.223.228" #uut13
+	"166.255.223.219" #uut14
+	"166.255.223.232" #uut15
+	"166.255.223.220" #uut16
+	"166.255.223.234" #uut17
+	"166.255.223.223" #uut18
+	"166.255.223.233" #uut19
+	"166.255.223.229" #uut20
+	"166.255.223.217" #uut21
+#	"166.255.223.230" #uut22 ethernet
+	"166.255.223.222" #uut23
+	"166.255.223.226" #uut24
+#	"None" #uut25 ethernet
+#	"None" #uut26 ethernet
+)
 #END
 
 
@@ -151,10 +182,12 @@ do
 done
 END
 #: <<'END'
-for item in "${listMac[@]}"
+#for item in "${listMac[@]}"
+for item in "${listIpv4[@]}"
 do
 	printf "%s\n" % $item
-	$NETMGR -g -d $item -t 60 $arg | grep $grep
+	#$NETMGR -g -d $item -t 60 $arg | grep $grep
+    $NETMGR -d $item -t 60 $arg | grep $grep
     #getCore $item
     #removeCore $item
 	printf "\n"
