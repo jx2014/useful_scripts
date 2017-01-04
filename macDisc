@@ -40,21 +40,22 @@
 #11/24/2016 add sleep after neigh discover
 #12/2/2016  change gmi nic_el_read to el_data read; meter_el_state to el_data range
 #12/5/2016  add line break between battery status.
+#1/4/2017   change event log logic (it used to pull same log over and over)
 
-ver="2016.12.5-13.55"
+ver="2017.1.4-11.22"
 
 GetMeterElState=0
 GetLastGaspLog=0
 GetEventLog=0
-event_log_loop_timer=3600
+event_log_loop_timer=120
 GetLoop=0
 GetRebootLog=0
 TestGPIO=0
-GPIO_loop_timer=3600 #default test GPIO every 1 hr
+GPIO_loop_timer=60 #default test GPIO every 1 minute
 GpioW="ota" #default Gpio get method is set to OTA, other method includes eth%x
 TestSerial=0
 SerialW="ota" #default Seiral port is tested in mutt mode, using self loop back plug
-Serial_loop_timer=3600 #default test Serial port every 1 hr
+Serial_loop_timer=60 #default test Serial port every 1 minute
 TestEcho=0
 GetRSSI=0
 SleepTimer=60
@@ -113,7 +114,7 @@ while getopts "leLgI:S:ErcPCht:sbvp:D" opt; do
        echo "- Test FW CRC"
        ;;
     t) SleepTimer=${OPTARG}
-       echo "- Set looop timer(secs):" $OPTARG>&2
+       echo "- Set loop timer(secs):" $OPTARG>&2
        ;;
     s) GetSig=1
        echo "- Get FW Signatures"
@@ -150,6 +151,7 @@ while getopts "leLgI:S:ErcPCht:sbvp:D" opt; do
  -t n (set loop timer, default is 60seconds
  -s Get FW signatures (more stringent than CRC)
  -b Get Battery status (AP/Relay only)
+ -D debug mode
 
 Examples:
  1. logging reboot count for every 10secs for list of mac IDs in macIDs
@@ -214,6 +216,7 @@ GetImage() {
 }
 
 GetElState() {
+    # function returns first sequence and last sequence of event log, with a given mac ID (ipv6)
     local inputMac=$1
     local st
     local cfs=0
@@ -235,6 +238,7 @@ GetElState() {
 }
 
 ReadEL() {
+    # read event log between sequence with a given mac ID
     local inputMac=$1
     local cFS=$2
     local cLS=$3
@@ -285,10 +289,12 @@ ReadEL() {
 	        fi
 
             #if [ "$logtype" = "el" ] ; then
-            # the following works for meter NICs, but not AP/Relay
+            # the following works for meter NICs, but not AP/Relay; besure to change event_log looping func
         	#$NETMGR -g -d $item gmi nic_el_read "$rFS":"$rLS" >> "$logfile"
-            # the following works for AP/Relay, not sure for meter NICs
+
+            # the following works for AP/Relay as well as  meter NICs; besure to change event_log looping func
             $NETMGR -g -d $item el_data read "$rFS" "$rLS" >> "$logfile"
+
             #else if [ "$logtype" = "lg" ] ; then
         	#    $NETMGR -g -d $item last_gasp "$rFS":"$cLS" >> "$logfile"
             #fi
@@ -512,7 +518,13 @@ date
                 #check if event log file already exists:
                 if [ -e "$logfile" ]; then
                     # last sequence from existing log file
-                    fLS=$(tac "$logfile" | grep -m 1 '  seq' | awk '{printf $2}' | sed 's|,||g')
+                    
+                    # the following works if the event log is saved by gmi nic_el_read a;b
+                    #fLS=$(tac "$logfile" | grep -m 1 '  seq' | awk '{printf $2}' | sed 's|,||g')
+
+                    # the following works if the event log is saved by el_data read
+                    fLS=$(tac "$logfile" | grep -m 1 ' seqnum' | awk '{printf $3}' | sed 's|,||g')
+
                     #debug
                     if [[ $debug == 1 ]]; then printf "event log file last sequence (fLS) is $fLS\n"; fi
                     let fLS=$fLS+0 # if there is none, then set the last sequence from file to 0
@@ -530,6 +542,7 @@ date
                     fi
                 else
                     # event log doens't exist, then read from first sequence to last sequence, 30 entries at a time.
+                    if [[ $debug == 1 ]]; then printf "log file doesn't exist, create a new one\n"; fi
                     let rFS=$cFS
                     ReadEL $item $rFS $rLS    
                 fi
@@ -603,7 +616,7 @@ date
             t0=$(date +%s)
             printf "\n...GPIO Test...................\n"
             if [[ $t0 > $t_gpio_1 ]]; then
-                let t_gpio_1=$t0+$event_log_loop_timer                
+                let t_gpio_1=$t0+$GPIO_loop_timer                
                 for item in "${ipArray[@]}"
                 do
                     if [[ $debug == 1 ]]; then printf "GpioW: %s\n" $GpioW; fi
