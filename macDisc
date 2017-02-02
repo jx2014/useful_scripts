@@ -41,8 +41,9 @@
 #12/2/2016  change gmi nic_el_read to el_data read; meter_el_state to el_data range
 #12/5/2016  add line break between battery status.
 #1/4/2017   change event log logic (it used to pull same log over and over)
+#2/2/2017   modifiy image signature result
 
-ver="2017.1.4-11.22"
+ver="2017.2.2-10.02"
 
 GetMeterElState=0
 GetLastGaspLog=0
@@ -950,18 +951,27 @@ date
                 #printf "fw0 is: %s\n" $fw0
                 #printf "fw1 is: %s\n" $fw1
 		        result0=$($NETMGR -g -d $item -t 12 image image_verify_signatures $fw0 2>&1)
-                prodkey0=$(echo "$result0" | grep 'prod key:' | awk {'printf "%s %s", $4, $5'})
-                DEVkey0=$(echo "$result0" | grep 'DEV key:' | awk {'printf "%s %s", $4, $5'})
-                TSTkey0=$(echo "$result0" | grep 'TST key:' | awk {'printf "%s %s", $4, $5'})
+                prodkey0=$(echo "$result0" | grep 'Key')
+                DEVkey0=$(echo "$result0" | grep 'DEV key:')
+                TSTkey0=$(echo "$result0" | grep 'TST key:')
+                #prodkey0=$(echo "$result0" | grep 'prod key:' | awk {'printf "%s %s", $4, $5'})
+                #DEVkey0=$(echo "$result0" | grep 'DEV key:' | awk {'printf "%s %s", $4, $5'})
+                #TSTkey0=$(echo "$result0" | grep 'TST key:' | awk {'printf "%s %s", $4, $5'})
 
                 sleep 1
-		        result1=$($NETMGR -g -d $item -t 12 image image_verify_signatures $fw1 2>&1)    
-                prodkey1=$(echo "$result1" | grep 'prod key:' | awk {'printf "%s %s", $4, $5'})
-                DEVkey1=$(echo "$result1" | grep 'DEV key:' | awk {'printf "%s %s", $4, $5'})
-                TSTkey1=$(echo "$result1" | grep 'TST key:' | awk {'printf "%s %s", $4, $5'})
+		        result1=$($NETMGR -g -d $item -t 12 image image_verify_signatures $fw1 2>&1)
+                prodkey1=$(echo "$result1" | grep 'Key')
+                DEVkey1=$(echo "$result1" | grep 'DEV key:')
+                TSTkey1=$(echo "$result1" | grep 'TST key:')  
+                #prodkey1=$(echo "$result1" | grep 'prod key:' | awk {'printf "%s %s", $4, $5'})
+                #DEVkey1=$(echo "$result1" | grep 'DEV key:' | awk {'printf "%s %s", $4, $5'})
+                #TSTkey1=$(echo "$result1" | grep 'TST key:' | awk {'printf "%s %s", $4, $5'})
 			
 		        datetime=$(date +%Y-%m-%d,%H:%M:%S)
-		        echo "$datetime, $item, $fw0, prod0:$prodkey0, DEV0:$DEVkey0, TST0:$TSTkey0, $fw1, prod1:$prodkey1, DEV1:$DEVkey1, TST1:$TSTkey1" | tee /dev/tty |tee >> "sig_log_${macAndIps["$item"]}.txt"
+		        echo "$datetime, $item, $fw0, prod0:$prodkey0, DEV0:$DEVkey0, TST0:$TSTkey0" | tee /dev/tty |tee >> "sig_log_${macAndIps["$item"]}.txt"
+		        datetime=$(date +%Y-%m-%d,%H:%M:%S)
+                echo "$datetime, $item, $fw1, prod1:$prodkey1, DEV1:$DEVkey1, TST1:$TSTkey1" | tee /dev/tty |tee >> "sig_log_${macAndIps["$item"]}.txt"
+                #printf "\n$datetime, $item\n$fw0\n$result0\n$fw1\n$result1\n" | tee /dev/tty |tee >> "sig_log_${macAndIps["$item"]}.txt"
 
 
 	        done
