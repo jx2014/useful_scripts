@@ -42,8 +42,9 @@
 #12/5/2016  add line break between battery status.
 #1/4/2017   change event log logic (it used to pull same log over and over)
 #2/2/2017   modifiy image signature result
+#2/17/2017  add Ethernet interface for last gasp and event log 
 
-ver="2017.2.2-10.02"
+ver="2017.2.17-17.00"
 
 GetMeterElState=0
 GetLastGaspLog=0
@@ -54,6 +55,8 @@ GetRebootLog=0
 TestGPIO=0
 GPIO_loop_timer=60 #default test GPIO every 1 minute
 GpioW="ota" #default Gpio get method is set to OTA, other method includes eth%x
+LastGaspLogW="ota"
+EventLogW="ota"
 TestSerial=0
 SerialW="ota" #default Seiral port is tested in mutt mode, using self loop back plug
 Serial_loop_timer=60 #default test Serial port every 1 minute
@@ -80,13 +83,15 @@ RssiFirstRun=0
 
 
 
-while getopts "leLgI:S:ErcPCht:sbvp:D" opt; do
+while getopts "l:e:LgI:S:ErcPCht:sbvp:D" opt; do
 	case "$opt" in
-	l) GetLastGaspLog=1
-       echo "- Get Last Gasp Log was triggered!"
+	l) LastGaspLogW=${OPTARG}
+	    GetLastGaspLog=1
+       echo "- Get Last Gasp Log was triggered: " $OPTARG
 	   ;;
-	e) GetEventLog=1
-       echo "- Get Event Log was triggered!"
+	e) EventLogW=${OPTARG} 
+	    GetEventLog=1
+       echo "- Get Event Log was triggered: " $OPTARG
 	   ;;
 	L) GetLoop=1 
  	   echo "- Looping is On"
@@ -135,9 +140,8 @@ while getopts "leLgI:S:ErcPCht:sbvp:D" opt; do
        ;;
     h)
        printf "Avaliable options:
- -m Get Meter El State (for Meter NIC)
- -l Get Last Gasp Log (for Meter NIC)
- -e Get Event Log (for Meter NIC)
+ -l Get Last Gasp Log, use '-l ethx' to use ethernet interface.
+ -e Get Event Log, use '-e ethx' to use ethernet interface.
  -L Looping 
  -g Log reboot counter and device type
  -I (Capital I) Test GPIO, use '-I ethx' to test GPIO via ethernet, 
@@ -218,10 +222,11 @@ GetImage() {
 
 GetElState() {
     # function returns first sequence and last sequence of event log, with a given mac ID (ipv6)
-    local inputMac=$1
+    local item=$1
     local st
     local cfs=0
     local cls=0
+    local useEth=$2
     # cfs - current first sequence, cls - current last sequence
 
     # function return event log first sequence and last sequence
@@ -232,7 +237,19 @@ GetElState() {
 	#cls=$(echo $st | awk {'printf $2'})
 
     #the following works for Ap/Relay, not sure for Meter NICs
-    st=$($NETMGR -g -d $inputMac el_data range | sed 's/[^0-9]//g')
+    #st=$($NETMGR -g -d $inputMac el_data range | sed 's/[^0-9]//g')
+	#cls=$(echo $st | awk {'printf $1'}) #max seq
+	#cfs=$(echo $st | awk {'printf $2'}) #min seq
+
+    #for debug
+    #printf "useEth: %s\n" $useEth
+    if [[ $useEth == 0 ]]; then
+        #printf "item: %s\n" $item
+        st=$($NETMGR -g -d $item el_data range | sed 's/[^0-9]//g')
+    else #use ethernet interface
+        #printf "item: %s\n" $item
+        st=$($NETMGR -d $item el_data range | sed 's/[^0-9]//g')
+    fi
 	cls=$(echo $st | awk {'printf $1'}) #max seq
 	cfs=$(echo $st | awk {'printf $2'}) #min seq
     echo "$cfs $cls"
@@ -243,72 +260,79 @@ ReadEL() {
     local inputMac=$1
     local cFS=$2
     local cLS=$3
-    local logtype=${4:-0} #el or lg (event log is 0, last gasp is 1)
+    local useEth=$4
     local rFS="$cFS"
     local rLS=0
-    local logfile="event_log_${macAndIps["$item"]}.txt"
+    local logfile="event_log_${macAndIps["$ipv6"]}.txt"
+   
+    #printf "ReadEL()\n"
+    #printf "useEth: %s\n" $useEth
+    #printf "item: %s\n" $item
 
-    if [[ $logtype == 1 ]]; then
-        local lglogfile="last_gasp_${macAndIps["$item"]}.txt"
-    fi
+    n=0
+    m=0
+    i=30
 
-    if [[ $logtype == 0 ]]; then
-        n=0
-        m=0
-        i=30
+    let "TotalLogs=$cLS-$cFS" #get total log entries
+    let "m=$TotalLogs/$i"	#divide into n parts
+    #printf "n: %s, m: %m\n" $n $m
 
-        let "TotalLogs=$cLS-$cFS" #get total log entries
-        let "m=$TotalLogs/$i"	#divide into n parts
+    while (( $n <= $m ))
+    do
+        # the last squence to be read, is equal to the first sequence + i entries
+        # i.e. if want to read sequence 10 to 105, then the first time read will be from 10 to 40
+        # next read will be from 41 to 71 and so on. 
+        # The reason is nic_el_read can only read so many logs at once depending on the size of each event entries. 
+        # 30 is randomly selected for best practice.
+        # reading from 10 to 105 entries (assume nic event log entries range from 0 to 200, we only want range 10 to 105)
+        # TotalLogs: 95
+        # m:         3
+        # cFS:      10
+        # rFS:     105
+        # i:        30
+        # n     0    1     2     3 
+        # rFS  10   41    72   103
+        # rLS  40   71   102   105
 
-        while (( $n <= $m ))
-        do
-            # the last squence to be read, is equal to the first sequence + i entries
-            # i.e. if want to read sequence 10 to 105, then the first time read will be from 10 to 40
-            # next read will be from 41 to 71 and so on. 
-            # The reason is nic_el_read can only read so many logs at once depending on the size of each event entries. 
-            # 30 is randomly selected for best practice.
-            # reading from 10 to 105 entries (assume nic event log entries range from 0 to 200, we only want range 10 to 105)
-            # TotalLogs: 95
-            # m:         3
-            # cFS:      10
-            # rFS:     105
-            # i:        30
-            # n     0    1     2     3 
-            # rFS  10   41    72   103
-            # rLS  40   71   102   105
+        let "n=$n+1"	# 1, 2, 3, 4
+        let "rLS=$rFS+i" # 40, 71, 102, 133
+        
+        #for debug
+        if [[ $debug == 1 ]]; then printf "n:$n, m:$m, rFS:$rFS, rLS:$rLS, cFS:$cFS, cLS:$cLS\n"; fi
 
-	        let "n=$n+1"	# 1, 2, 3, 4
-	        let "rLS=$rFS+i" # 40, 71, 102, 133
-            
-            #for debug
-            if [[ $debug == 1 ]]; then printf "n:$n, m:$m, rFS:$rFS, rLS:$rLS, cFS:$cFS, cLS:$cLS\n"; fi
-	
-	        if (( $rLS > $cLS )); then # if rLS is 133, then rLS is set to cLS 105
-                if [[ $debug == 1 ]]; then printf "rLS ($rLS) > cLS ($cLS)\n"; fi
-		        let "rLS=$cLS"
-                let "n=$n+1"
-	        fi
+        if (( $rLS > $cLS )); then # if rLS is 133, then rLS is set to cLS 105
+            if [[ $debug == 1 ]]; then printf "rLS ($rLS) > cLS ($cLS)\n"; fi
+	        let "rLS=$cLS"
+            let "n=$n+1"
+        fi
 
-            #if [ "$logtype" = "el" ] ; then
-            # the following works for meter NICs, but not AP/Relay; besure to change event_log looping func
-        	#$NETMGR -g -d $item gmi nic_el_read "$rFS":"$rLS" >> "$logfile"
+        #if [ "$logtype" = "el" ] ; then
+        # the following works for meter NICs, but not AP/Relay; besure to change event_log looping func
+    	#$NETMGR -g -d $item gmi nic_el_read "$rFS":"$rLS" >> "$logfile"
 
-            # the following works for AP/Relay as well as  meter NICs; besure to change event_log looping func
+        # the following works for AP/Relay as well as  meter NICs; besure to change event_log looping func
+
+        #$NETMGR -g -d $item el_data read "$rFS" "$rLS" >> "$logfile"
+        if [[ $useEth == 0 ]]; then
+            #printf "FSU: %s \n" $item
             $NETMGR -g -d $item el_data read "$rFS" "$rLS" >> "$logfile"
+        else #use ethernet interface
+            #printf "Eth: %s \n" $item                
+            $NETMGR -d $item el_data read "$rFS" "$rLS" >> "$logfile"               
+        fi
 
-            #else if [ "$logtype" = "lg" ] ; then
-        	#    $NETMGR -g -d $item last_gasp "$rFS":"$cLS" >> "$logfile"
-            #fi
-            # 10:40
-            # 41:71
-            # 72:102
-            # 103:105
+        #else if [ "$logtype" = "lg" ] ; then
+    	#    $NETMGR -g -d $item last_gasp "$rFS":"$cLS" >> "$logfile"
+        #fi
+        # 10:40
+        # 41:71
+        # 72:102
+        # 103:105
 
-	        #read i entries at a time
-	        let "rFS=rLS+1" # 41, 72, 103, 106
+        #read i entries at a time
+        let "rFS=rLS+1" # 41, 72, 103, 106
 
-        done
-    fi
+    done
 }
 
 
@@ -332,6 +356,10 @@ elif [[ "$SerialW" = *"eth"* ]]; then
     ethIf=$SerialW
 elif [[ "$GpioW" = *"eth"* ]]; then
     ethIf=$GpioW
+elif [[ "$LastGaspLogW" = *"eth"* ]]; then
+    ethIf=$LastGaspLogW
+elif [[ "$EventLogW" = *"eth"* ]]; then
+    ethIf=$EventLogW
 else
     ethIf=0
 fi
@@ -397,7 +425,7 @@ date
 			        listIPv6NotFound+=("$ipv6") # ipv6 not in fsu nodeq goes in this list.
 		        fi # if [ "$boot_msg" != "Request timed out" ]; then 
 	        else
-		        printf "%s NOT found in nodeq" "$macid1"
+		        printf "%s NOT found in nodeq." "$macid1"
 		        macNotFound+=("$macid1")
 		        listIPv6NotFound+=("$ipv6")
 	        fi # end of if [ "$found" = 1 ]; then
@@ -453,12 +481,31 @@ date
         # getting last gasp logs based on Total record count
         if [ "$GetLastGaspLog" = 1 ]; then
             printf "\n...Last Gasp..................\n"
-	        for item in "${listIPv6[@]}"
+
+            # decide which array to use:
+            if [[ $debug == 1 ]]; then printf "Last Gasp Log Interface: %s \n" $LastGaspLogW; fi
+            if [[ $LastGaspLogW == *'eth'* ]]; then
+                ipArray=("${listIPv6eth[@]}")
+                useEth=1
+            else
+                ipArray=("${listIPv6[@]}")
+                useEth=0
+            fi
+
+            for ipv6 in "${ipArray[@]}"
 	        do
-		        lastGaspRecord=$($NETMGR -g -d $item last_gasp stat | grep total | sed 's/[^0-9]//g')
+                if [[ $useEth == 1 ]]; then #use ethernet interface
+                    #printf "Before: $item, $ethIf\n"
+                    item=$ipv6'%'$ethIf     
+                    lastGaspRecord=$($NETMGR -d $item last_gasp stat | grep total | sed 's/[^0-9]//g')
+                    #printf "After: $item, $ethIf\n"
+                else
+                    lastGaspRecord=$($NETMGR -g -d $item last_gasp stat | grep total | sed 's/[^0-9]//g')
+                fi
+
 		        printf "%s: Last Gasp records count: %d, retrieving......" $item $lastGaspRecord
 
-                logfile="last_gasp_${macAndIps["$item"]}.txt"
+                logfile="last_gasp_${macAndIps["$ipv6"]}.txt"
 
                 #check if event log file already exists:
                 if [ -e "$logfile" ]; then
@@ -478,7 +525,13 @@ date
                 if [[ $debug == 1 ]]; then printf "fLS: $fLS, n:$n lastGaspRecord:$lastGaspRecord\n"; fi
 	            while [ $n -le $lastGaspRecord ]
 	            do
-		            $NETMGR -g -d $item last_gasp any_rec $n >> $logfile
+                    #$NETMGR -g -d $item last_gasp any_rec $n >> $logfile
+                    if [[ $useEth == 0 ]]; then
+                        $NETMGR -g -d $item last_gasp any_rec $n >> $logfile
+                    else #use ethernet interface
+                        $NETMGR -d $item last_gasp any_rec $n >> $logfile
+                    fi
+
                     #echo -ne "$n\r"
                     printf '\b\b\b\b\b%5d' $n
                     let n=$n+1
@@ -497,10 +550,30 @@ date
         t0=$(date +%s)
         printf "\n...Event Logs.................\n"
         if [[ $t0 > $t1 ]]; then
-            for item in "${listIPv6[@]}"
+            
+            # decide which array to use:
+            if [[ $debug == 1 ]]; then printf "Event Log Interface: %s \n" $EventLogW; fi
+
+            if [[ $EventLogW == *'eth'* ]]; then
+                ipArray=("${listIPv6eth[@]}")
+                useEth=1
+            else
+                ipArray=("${listIPv6[@]}")
+                useEth=0
+            fi
+
+            for ipv6 in "${ipArray[@]}"
             do            
-                let t1=$t0+$event_log_loop_timer
-                
+                if [[ $useEth == 1 ]]; then
+                    #printf "Before: $item, $ethIf\n"
+                    item=$ipv6'%'$ethIf
+                    #printf "After: $ipv6\n"
+                else
+                    item=$ipv6
+                    #printf "$ipv6"
+                fi
+
+                let t1=$t0+$event_log_loop_timer                
                         
                 cFS=0 #cFS, cLS, current sequences from NIC
                 cLS=0
@@ -511,7 +584,8 @@ date
                 logfile="event_log_${macAndIps["$item"]}.txt"
 
                 #get current first and last sequence 
-                read cFS cLS < <(GetElState $item)
+                read cFS cLS < <(GetElState $item $ethIf) #2/17/2016 uncomment after GetElState is fixed
+                #GetElState $item $ethIf
                 #debug
                 if [[ $debug == 1 ]]; then printf "NIC event log seq range (cFS to cLS): $cFS to $cLS\n"; fi
                 let rLS=$cLS
@@ -532,11 +606,11 @@ date
 
                     if [[ $cLS > $fLS ]]; then #event log sequence from NIC is > from file
                         let rFS=$fLS+1 # set sequence to be read to last sequence from file + 1
-                        ReadEL $item $rFS $rLS
+                        ReadEL $item $rFS $rLS $useEth
 
                     elif [[ $fLS > $cLS ]]; then # if for some reason, the event log sequence from file is > from NIC, then read from the beginning
                         let rFS=$cFS # set sequence to be read to first sequence from NIC
-                        ReadEL $item $rFS $rLS
+                        ReadEL $item $rFS $rLS $useEth
 
                     elif [[ $fLS == $cLS ]]; then # if event log sequence from file is == from NIC, then do not do anything
                         continue
@@ -545,9 +619,9 @@ date
                     # event log doens't exist, then read from first sequence to last sequence, 30 entries at a time.
                     if [[ $debug == 1 ]]; then printf "log file doesn't exist, create a new one\n"; fi
                     let rFS=$cFS
-                    ReadEL $item $rFS $rLS    
+                    ReadEL $item $rFS $rLS $useEth
                 fi
-                printf "$item, first seq: $rFS, last seq: $rLS\n"
+                printf "%s, first seq: $rFS, last seq: $rLS\n" $item
             done
             else
                 printf "%s secs until next Event Log check\n" $[t1-t0]
