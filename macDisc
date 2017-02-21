@@ -14,8 +14,8 @@
 #04/08/2016 add clear rssi to get fresh data each time to get rssi
 #04/13/2016 add reboot counter logging and modified date time format
 #04/14/2016 add device type to reboot counter logging,
-#	    add handling for Request timed out
-#	    modify FirstRun parameters so it makes more sense
+#	        add handling for Request timed out
+#   	    modify FirstRun parameters so it makes more sense
 #04/26/2016 change net_mgr path
 #05/20/2016 add AP ping test
 #05/25/2016 add macID size checking
@@ -43,8 +43,10 @@
 #1/4/2017   change event log logic (it used to pull same log over and over)
 #2/2/2017   modifiy image signature result
 #2/17/2017  add Ethernet interface for last gasp and event log 
+#2/21/2017  fix last gasp using 'ota'
 
-ver="2017.2.17-17.00"
+
+ver="2017.2.21-14.00"
 
 GetMeterElState=0
 GetLastGaspLog=0
@@ -176,6 +178,9 @@ Examples:
     (Test Serial port, GPIOs, ipv6 pinging, get reboot, rssi and 
     loop every 120secs for a list of macs)
     \$ macDisc -S 'eth5' -I 'eth6' -p 'eth5' -Lgr -t 120 macIDs
+
+ 5. To get event log(ota), event log(ethernet), reboot count(ota) every 2mins:
+    \$ macDisc -e 'ota' -l 'eth6' -gL macIDs
 
 Note:
     *1: \"eth5\" is the ethernet interface. Your enivornment may be different, 
@@ -500,11 +505,12 @@ date
                     lastGaspRecord=$($NETMGR -d $item last_gasp stat | grep total | sed 's/[^0-9]//g')
                     #printf "After: $item, $ethIf\n"
                 else
+                    item=$ipv6	
                     lastGaspRecord=$($NETMGR -g -d $item last_gasp stat | grep total | sed 's/[^0-9]//g')
                 fi
 
 		        printf "%s: Last Gasp records count: %d, retrieving......" $item $lastGaspRecord
-
+	            if [[ $debug == 1 ]]; then printf "lastGaspRecord: $s\nitem: $s\n" $lastGaspRecord $item; fi
                 logfile="last_gasp_${macAndIps["$ipv6"]}.txt"
 
                 #check if event log file already exists:
