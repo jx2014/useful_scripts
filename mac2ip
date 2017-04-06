@@ -1,0 +1,37 @@
+#!/bin/bash
+
+port=3332
+macid=${1}
+
+OPTIND=2
+while getopts "P:" opt; do
+    case "$opt" in
+    P) port="$OPTARG"
+       ;;
+    esac
+done
+shift "$((OPTIND - 1))"
+
+#printf "%sPort is: $port\n%s"
+
+#macid=${1}
+
+#echo -n "Enter the last six number/digits of MAC ID: "
+#read macid
+
+#echo $macid
+
+ip=$(echo $macid | sed "s/..\B/&./g")
+
+variableName=ip$macid
+
+#eval "echo \$$port"
+
+export eval $variableName=$(net_mgr -P $port -i nodeq 0 | grep $ip | cut -c 1-24 | sed "s/ //g" | sed "s/\.//g" | sed "s/....\B/&:/g" | sed "s/^../fe80::2/")
+
+#echo "Use Variable name: $variableName"
+
+#export ABC=123abc
+
+eval "echo \$$variableName"
+
