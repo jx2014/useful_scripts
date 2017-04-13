@@ -44,6 +44,7 @@
 #2/2/2017   modifiy image signature result
 #2/17/2017  add Ethernet interface for last gasp and event log 
 #2/21/2017  fix last gasp using 'ota'
+#4/12/2017  add uut number for each mac id, log file and print screen
 
 
 ver="2017.2.21-14.00"
@@ -348,6 +349,7 @@ listIPv6=() #used by ota
 listmacid=() #used by ota and eth
 unset macAndIps
 declare -A macAndIps
+declare -A uutAndIps
 macNotFound=() # used by ota
 listIPv6NotFound=() #used by ota
 
@@ -370,16 +372,17 @@ else
 fi
 
 date
-
+uutno=0
     while IFS='' read -r line || [[ -n "$line" ]]; do
         #while IFS= read -r line; do
+        let "uutno=uutno+1" #will append this uut number to each mac ID
         if [[ $debug == 1 ]]; then printf $line; fi
         [ "${line:0:1}" = "#" ] && continue
-        size=${#line}	    
+        size=${#line}
         if [ $size -eq 16 ]; then #each mac ID is 16 characters long, anything short than that will be discarded
 
 	        #echo "macs: $line"
-	        listmacid+=("$line")
+	        listmacid+=("$line")            
 
 	        # convert mac id 0013501234567890 to 00:13:50:12:34:56:78:90
 	        macid1=$(echo $line | sed "s/.\{2\}/&:/g" | sed "s/:$//" | sed -e "s/\(.*\)/\L\1/")
@@ -392,6 +395,8 @@ date
 
 	        # map ipv6 to macid for use to save filenames
 	        macAndIps["$ipv6"]="$line"
+            # use ipv6 to find uut number for save filenames
+            uutAndIps["$ipv6"]="$uutno"
 	
             # ota test
 	        found=0
@@ -415,7 +420,7 @@ date
 
 			        listIPv6+=("$ipv6")
 
-			        printf "%s found in nodeq," "$macid1"
+			        printf "uut%s %s found in nodeq," "$uutno" "$macid1"
 			        printf " reboot:%4s," "$bootcounter"
 			        printf " dev_typ:%3s," "$devicetype"
 
@@ -425,12 +430,12 @@ date
 			        #echo $ipv6
 			
 		        else	
-			        printf "%s OTA Request timed Out" "$macid1"
+			        printf "uut%s %s OTA Request timed Out" "$uutno" "$macid1"
 			        macNotFound+=("$macid1") # macs not in fsu nodeq goes in this list.
 			        listIPv6NotFound+=("$ipv6") # ipv6 not in fsu nodeq goes in this list.
 		        fi # if [ "$boot_msg" != "Request timed out" ]; then 
 	        else
-		        printf "%s NOT found in nodeq." "$macid1"
+		        printf "uut%s %s NOT found in nodeq." "$uutno" "$macid1"
 		        macNotFound+=("$macid1")
 		        listIPv6NotFound+=("$ipv6")
 	        fi # end of if [ "$found" = 1 ]; then
@@ -461,7 +466,7 @@ date
 			                printf " Found with ethernet"
 			                printf " reboot:%4s," "$bootcounter"
 			                printf " dev_typ:%3s," "$devicetype"
-			                printf " ipv6:%s"   "$ipv6"
+			                printf " ipv6:%s uut%s"   "$ipv6" "$uutno"
                         else # if OTA didn't fail, then send message saying eth_ping is ok
                             printf " eth_ping: Ok"
                         fi
@@ -469,7 +474,7 @@ date
 			            #echo $ipv6
 			
 		            else	
-			            printf "%s Eth failed" "$macid1"
+			            printf "uut%s %s Eth failed" "$uutno" "$macid1"
 			            macEthNotFound+=("$macid1") # macs not in fsu nodeq goes in this list.
 			            listIPv6ethNotFound+=("$ipv6") # ipv6 not in fsu nodeq goes in this list.
                     fi # end of if [ "$boot_msg" != "Request timed out" ]; then 
@@ -509,9 +514,9 @@ date
                     lastGaspRecord=$($NETMGR -g -d $item last_gasp stat | grep total | sed 's/[^0-9]//g')
                 fi
 
-		        printf "%s: Last Gasp records count: %d, retrieving......" $item $lastGaspRecord
+		        printf "uut%s %s: Last Gasp records count: %d, retrieving......" ${uutAndIps["$ipv6"]} $item $lastGaspRecord
 	            if [[ $debug == 1 ]]; then printf "lastGaspRecord: $s\nitem: $s\n" $lastGaspRecord $item; fi
-                logfile="last_gasp_${macAndIps["$ipv6"]}.txt"
+                logfile="last_gasp_uut${uutAndIps["$ipv6"]}_${macAndIps["$ipv6"]}.txt"
 
                 #check if event log file already exists:
                 if [ -e "$logfile" ]; then
@@ -587,7 +592,7 @@ date
                 rLS=0
                 fLS=0 #fLS, the last sequence from log file
 
-                logfile="event_log_${macAndIps["$item"]}.txt"
+                logfile="event_log_uut${uutAndIps["$item"]}_${macAndIps["$item"]}.txt"
 
                 #get current first and last sequence 
                 read cFS cLS < <(GetElState $item $ethIf) #2/17/2016 uncomment after GetElState is fixed
@@ -627,7 +632,7 @@ date
                     let rFS=$cFS
                     ReadEL $item $rFS $rLS $useEth
                 fi
-                printf "%s, first seq: $rFS, last seq: $rLS\n" $item
+                printf "uut%s, %s, first seq: $rFS, last seq: $rLS\n" ${uutAndIps["$item"]} $item 
             done
             else
                 printf "%s secs until next Event Log check\n" $[t1-t0]
@@ -672,7 +677,7 @@ date
 
                             
 		                    datetime=$(date +%Y-%m-%d,%H:%M:%S)
-    	                    printf "%19s, %24s, %4s, %4s, %4s, %2s, %1s, %6s %6s %6s %6s \n" $datetime $item $PingW $result $packetForPing $pattern $rec $rtt | tee /dev/tty |tee >> "ping6_log_${macAndIps["$item"]}.txt"
+    	                    printf "%19s, %24s, %4s, %4s, %4s, %2s, %1s, %6s %6s %6s %6s \n" $datetime $item $PingW $result $packetForPing $pattern $rec $rtt | tee /dev/tty |tee >> "ping6_log_uut${uutAndIps["$ipv6"]}_${macAndIps["$item"]}.txt"
 
                         done # end of while loop
                     done # end of for loop 
@@ -715,7 +720,7 @@ date
                         printf "Testing GPIO using ethernet interface: %s\n" $GpioW
                         if [[ $debug == 1 ]]; then printf printf "ipv6: %s\n" $ip; fi                        
                     else
-                        printf "Un recongized option [%s], test with OTA instead\n" $GpioW
+                        printf "Unrecongized option [%s], test with OTA instead\n" $GpioW
                         useEth=0
                     fi
 
@@ -760,8 +765,8 @@ date
                         printf "%s\n" $item
 
 	                datetime=$(date +%Y-%m-%d,%H:%M:%S)        
-	                echo $datetime | tee /dev/tty | tee >>  "gpio_log_${macAndIps["$item"]}.txt"
-	                echo "Using ethernet" $useEth | tee >>  "gpio_log_${macAndIps["$item"]}.txt"
+	                echo $datetime | tee /dev/tty | tee >>  "gpio_log_uut${uutAndIps["$item"]}_${macAndIps["$item"]}.txt"
+	                echo "Using ethernet" $useEth | tee >>  "gpio_log_uut${uutAndIps["$item"]}_${macAndIps["$item"]}.txt"
 
 	
 	                #=================Begin of another 'for' loop====================
@@ -817,12 +822,12 @@ date
 
 	
 		                if [ "$GpioFirstRun" = 1 ]; then
-		                         rm "gpio_log_${macAndIps["$item"]}.txt"
+		                         rm "gpio_log_uut${uutAndIps["$item"]}_${macAndIps["$item"]}.txt"
 		                         GpioFirstRun=0
 		                fi
 		
-		                echo $Output_port " --- " $InputState $result | tee /dev/tty | tee >> "gpio_log_${macAndIps["$item"]}.txt"
-		                #echo " " >> "gpio_log_${macAndIps["$item"]}.txt"
+		                echo $Output_port " --- " $InputState $result | tee /dev/tty | tee >> "gpio_log_uut${uutAndIps["$item"]}_${macAndIps["$item"]}.txt"
+		                #echo " " >> "gpio_log_uut${uutAndIps["$item"]}_${macAndIps["$item"]}.txt"
 	
 	                done
 	                #=================end of another 'for' loop====================
@@ -878,7 +883,7 @@ date
                         [[ $port1 = 2 ]] && port1="Pass" || port1="Fail"
 
                         #datetime=$(date +%Y-%m-%d,%H:%M:%S)
-                        #printf "%-19s, %-29s, %-4s, %-4s, %-5s\n" $datetime $item $SerialW $port0 $port1 | tee /dev/tty | tee >> "serial_log_${macAndIps["$item"]}.txt"         
+                        #printf "%-19s, %-29s, %-4s, %-4s, %-5s\n" $datetime $item $SerialW $port0 $port1 | tee /dev/tty | tee >> "serial_log_uut${uutAndIps["$item"]}_${macAndIps["$item"]}.txt"         
 
                     else
                         printf '%s does not exist, can not test serial port with ethernet and Telnet' $SERIALPORT
@@ -900,7 +905,7 @@ date
                 fi # end of 'if [[ "$SerialW" = *"eth"* ]]; then'              
 
                 datetime=$(date +%Y-%m-%d,%H:%M:%S)	
-                printf "%-19s, %-24s, %-4s, %-4s, %-5s\n" $datetime $item $SerialW $port0 $port1 | tee /dev/tty | tee >> "serial_log_${macAndIps["$item"]}.txt"                                 
+                printf "%-19s, %-24s, %-4s, %-4s, %-5s\n" $datetime $item $SerialW $port0 $port1 | tee /dev/tty | tee >> "serial_log_uut${uutAndIps["$item"]}_${macAndIps["$item"]}.txt"                                 
 
             done # end of 'for item in "${listIPv6[@]}"'
 
@@ -918,14 +923,14 @@ date
                 printf "%s\n" $item
 
 	        if [ "$EchoFirstRun" = 1 ]; then
-		        rm "echo_log_${macAndIps["$item"]}.txt"
+		        rm "echo_log_uut${uutAndIps["$item"]}_${macAndIps["$item"]}.txt"
 		        EchoFirstRun=0
 	        fi
 
 	        datetime=$(date +%Y-%m-%d,%H:%M:%S)
-                echo $datetime | tee /dev/tty | tee  >> "echo_log_${macAndIps["$item"]}.txt"
-                $NETMGR -g -d $item echo $byte_stream | tee /dev/tty | tee >> "echo_log_${macAndIps["$item"]}.txt"
-	        echo " " >> "echo_log_${macAndIps["$item"]}.txt"
+                echo $datetime | tee /dev/tty | tee  >> "echo_log_uut${uutAndIps["$item"]}_${macAndIps["$item"]}.txt"
+                $NETMGR -g -d $item echo $byte_stream | tee /dev/tty | tee >> "echo_log_uut${uutAndIps["$item"]}_${macAndIps["$item"]}.txt"
+	        echo " " >> "echo_log_uut${uutAndIps["$item"]}_${macAndIps["$item"]}.txt"
 
 
         done
@@ -954,9 +959,9 @@ date
 	        $NETMGR -g -d $item chanstats clear
 	
 	        datetime=$(date +%Y-%m-%d,%H:%M:%S)	
-            echo $datetime | tee /dev/tty | tee  >> "rssi_log_${macAndIps["$item"]}.txt"
-	        $NETMGR -g -d $item chanstats >> "rssi_log_${macAndIps["$item"]}.txt"
-	        echo " " >> "rssi_log_${macAndIps["$item"]}.txt"
+            echo $datetime | tee /dev/tty | tee  >> "rssi_log_uut${uutAndIps["$item"]}_${macAndIps["$item"]}.txt"
+	        $NETMGR -g -d $item chanstats >> "rssi_log_uut${uutAndIps["$item"]}_${macAndIps["$item"]}.txt"
+	        echo " " >> "rssi_log_uut${uutAndIps["$item"]}_${macAndIps["$item"]}.txt"
 
         done
         fi
@@ -971,7 +976,7 @@ date
 
 	
 	        datetime=$(date +%Y-%m-%d,%H:%M:%S)	
-            #echo $datetime | tee /dev/tty | tee  >> "ping_log_${macAndIps["$item"]}.txt"
+            #echo $datetime | tee /dev/tty | tee  >> "ping_log_uut${uutAndIps["$item"]}_${macAndIps["$item"]}.txt"
             pingcommand='ping'
 
             # sending ping
@@ -989,7 +994,7 @@ date
 
 
             # log ping result    
-	        echo $datetime',' $TxPacket',' $RxPacket >> "aping_log_${macAndIps["$item"]}.txt"
+	        echo $datetime',' $TxPacket',' $RxPacket >> "aping_log_uut${uutAndIps["$item"]}_${macAndIps["$item"]}.txt"
             
             # clear ping log
             $NETMGR -g -d $item ping clear &> /dev/null
@@ -1005,7 +1010,7 @@ date
 	        do
 		        #printf "%s\n" $item
 	          
-		        #date >> "reboot_log_${macAndIps["$item"]}.txt"
+		        #date >> "reboot_log_uut${uutAndIps["$item"]}_${macAndIps["$item"]}.txt"
                 read fw0 fw1 < <(GetImage $item)
                 #printf "fw0 is: %s\n" $fw0
                 #printf "fw1 is: %s\n" $fw1
@@ -1014,7 +1019,7 @@ date
 
 			
 		        datetime=$(date +%Y-%m-%d,%H:%M:%S)
-		        echo "$datetime, $item, $fw0, $crcresult1, $fw1, $crcresult2" | tee /dev/tty |tee >> "crc_log_${macAndIps["$item"]}.txt"
+		        echo "$datetime, $item, $fw0, $crcresult1, $fw1, $crcresult2" | tee /dev/tty |tee >> "crc_log_uut${uutAndIps["$item"]}_${macAndIps["$item"]}.txt"
 
 	        done
         fi
@@ -1026,7 +1031,7 @@ date
 	        do
 		        #printf "%s\n" $item
 	          
-		        #date >> "reboot_log_${macAndIps["$item"]}.txt"
+		        #date >> "reboot_log_uut${uutAndIps["$item"]}_${macAndIps["$item"]}.txt"
                 read fw0 fw1 < <(GetImage $item)
                 #printf "fw0 is: %s\n" $fw0
                 #printf "fw1 is: %s\n" $fw1
@@ -1048,10 +1053,10 @@ date
                 #TSTkey1=$(echo "$result1" | grep 'TST key:' | awk {'printf "%s %s", $4, $5'})
 			
 		        datetime=$(date +%Y-%m-%d,%H:%M:%S)
-		        echo "$datetime, $item, $fw0, prod0:$prodkey0, DEV0:$DEVkey0, TST0:$TSTkey0" | tee /dev/tty |tee >> "sig_log_${macAndIps["$item"]}.txt"
+		        echo "$datetime, $item, $fw0, prod0:$prodkey0, DEV0:$DEVkey0, TST0:$TSTkey0" | tee /dev/tty |tee >> "sig_log_uut${uutAndIps["$item"]}_${macAndIps["$item"]}.txt"
 		        datetime=$(date +%Y-%m-%d,%H:%M:%S)
-                echo "$datetime, $item, $fw1, prod1:$prodkey1, DEV1:$DEVkey1, TST1:$TSTkey1" | tee /dev/tty |tee >> "sig_log_${macAndIps["$item"]}.txt"
-                #printf "\n$datetime, $item\n$fw0\n$result0\n$fw1\n$result1\n" | tee /dev/tty |tee >> "sig_log_${macAndIps["$item"]}.txt"
+                echo "$datetime, $item, $fw1, prod1:$prodkey1, DEV1:$DEVkey1, TST1:$TSTkey1" | tee /dev/tty |tee >> "sig_log_uut${uutAndIps["$item"]}_${macAndIps["$item"]}.txt"
+                #printf "\n$datetime, $item\n$fw0\n$result0\n$fw1\n$result1\n" | tee /dev/tty |tee >> "sig_log_uut${uutAndIps["$item"]}_${macAndIps["$item"]}.txt"
 
 
 	        done
@@ -1067,9 +1072,9 @@ date
 		        batterystatus=$($NETMGR -g -d $item -j battery status 2>&1)
 			
 		        datetime=$(date +%Y-%m-%d,%H:%M:%S)
-                echo $datetime >> "battery_log_${macAndIps["$item"]}.txt"
-		        echo "$batterystatus" | tee -a "battery_log_${macAndIps["$item"]}.txt"
-                echo " " | tee -a "battery_log_${macAndIps["$item"]}.txt" # create line break
+                echo $datetime >> "battery_log_uut${uutAndIps["$item"]}_${macAndIps["$item"]}.txt"
+		        echo "$batterystatus" | tee -a "battery_log_uut${uutAndIps["$item"]}_${macAndIps["$item"]}.txt"
+                echo " " | tee -a "battery_log_uut${uutAndIps["$item"]}_${macAndIps["$item"]}.txt" # create line break
 
 	        done
         fi
@@ -1085,14 +1090,15 @@ date
 	        do
 		        #printf "%s\n" $item
 	          
-		        #date >> "reboot_log_${macAndIps["$item"]}.txt"
+		        #date >> "reboot_log_uut${uutAndIps["$item"]}_${macAndIps["$item"]}.txt"
 		        bootcounter=$($NETMGR -g -d $item conf mlme mlme_reboot_cntr | grep -oP '[0-9]*')
 		        devicetype=$($NETMGR -g -d $item sysvar 211 | grep -oP '(?<=DEVTYPE:\s).*')
 		
 		        devicetype=$(printf "%d\n" $devicetype)	
 			
 		        datetime=$(date +%Y-%m-%d,%H:%M:%S)
-		        echo "$datetime, $item, $bootcounter, $devicetype" | tee /dev/tty |tee >> "reboot_log_${macAndIps["$item"]}.txt"
+                printf "uut%s " ${uutAndIps["$item"]}
+		        echo "$datetime, $item, $bootcounter, $devicetype" | tee /dev/tty |tee >> "reboot_log_uut${uutAndIps["$item"]}_${macAndIps["$item"]}.txt"
 
 	        done
 
@@ -1101,14 +1107,17 @@ date
 	        do
 		        datetime=$(date +%Y-%m-%d,%H:%M:%S)
 		        bootcounter="mac not found"
-		        echo "$datetime, $item, $bootcounter, " | tee /dev/tty |tee >> "reboot_log_${macAndIps["$item"]}.txt"
+                printf "uut%s " ${uutAndIps["$item"]}
+		        echo "$datetime, $item, $bootcounter, " | tee /dev/tty |tee >> "reboot_log_uut${uutAndIps["$item"]}_${macAndIps["$item"]}.txt"
 	        done
         fi # end of 'if [ "$GetRebootLog" = 1 ]; then'
 
     printf "\n....not found in nodeq...........\n"
-    for item in ${macNotFound[@]}
+    #for item in ${macNotFound[@]}
+    for item in "${listIPv6NotFound[@]}"
     do
-        printf " %s\n" $item
+        #printf " %s\n" $item
+        printf "uut${uutAndIps["$item"]} ${macAndIps["$item"]}\n"
     done
 
         #printf "\n...Ipv6.......................\n"
