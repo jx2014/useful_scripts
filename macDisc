@@ -47,7 +47,7 @@
 #4/12/2017  add uut number for each mac id, log file and print screen
 
 
-ver="2017.2.21-14.00"
+ver="2017.4.12-14.00"
 
 GetMeterElState=0
 GetLastGaspLog=0
