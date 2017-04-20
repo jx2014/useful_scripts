@@ -27,7 +27,8 @@ variableName=ip$macid
 
 #eval "echo \$$port"
 
-export eval $variableName=$(net_mgr -P $port -i nodeq 0 | grep $ip | cut -c 1-24 | sed "s/ //g" | sed "s/\.//g" | sed "s/....\B/&:/g" | sed "s/^../fe80::2/")
+#export eval $variableName=$(net_mgr -P $port -i nodeq 0 | grep $ip | cut -c 1-24 | sed "s/ //g" | sed "s/\.//g" | sed "s/....\B/&:/g" | sed "s/^../fe80::2/")
+export eval $variableName=$(net_mgr -P $port -i nodeq 0 | grep $ip | cut -c 1-24 | sed "s/ //g" | sed "s/\.//g" | sed "s/\://g" | sed "s/....\B/&:/g" | sed "s/^../fe80::2/")
 
 #echo "Use Variable name: $variableName"
 
