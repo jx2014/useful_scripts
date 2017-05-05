@@ -958,16 +958,19 @@ uutno=0
         do
             printf "%s\n" $item
 	
-	        # add 4/8/2016 - clear rssi each time to get fresh data
-	        $NETMGR -g -d $item chanstats clear
+	        
 
             # sometimes the rssi log is empty, try echo once to get some data; add on 5/5/2017
-	        $NETMGR -g -d $item echo 1
+	        $NETMGR -g -d $item echo 3
 	
 	        datetime=$(date +%Y-%m-%d,%H:%M:%S)	
             echo $datetime | tee /dev/tty | tee  >> "rssi_log_uut${uutAndIps["$item"]}_${macAndIps["$item"]}.txt"
 	        $NETMGR -g -d $item chanstats >> "rssi_log_uut${uutAndIps["$item"]}_${macAndIps["$item"]}.txt"
 	        echo " " >> "rssi_log_uut${uutAndIps["$item"]}_${macAndIps["$item"]}.txt"
+
+            # add 4/8/2016 - clear rssi each time to get fresh data
+            # 5/5/2017 moved clear chanstats to the end.
+	        $NETMGR -g -d $item chanstats clear
 
         done
         fi
