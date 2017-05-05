@@ -45,9 +45,10 @@
 #2/17/2017  add Ethernet interface for last gasp and event log 
 #2/21/2017  fix last gasp using 'ota'
 #4/12/2017  add uut number for each mac id, log file and print screen
+#5/5/2017   fix event log logic, add uut number to event log;
+#           add echo once after clearing rssi log
 
-
-ver="2017.4.12-14.00"
+ver="2017.5.5-11.37"
 
 GetMeterElState=0
 GetLastGaspLog=0
@@ -226,6 +227,7 @@ GetImage() {
     echo "$fw0 $fw1"
 }
 
+#GetElState is not used by anything
 GetElState() {
     # function returns first sequence and last sequence of event log, with a given mac ID (ipv6)
     local item=$1
@@ -269,7 +271,7 @@ ReadEL() {
     local useEth=$4
     local rFS="$cFS"
     local rLS=0
-    local logfile="event_log_${macAndIps["$ipv6"]}.txt"
+    local logfile="event_log_uut${uutAndIps["$item"]}_${macAndIps["$ipv6"]}.txt"
    
     #printf "ReadEL()\n"
     #printf "useEth: %s\n" $useEth
@@ -593,6 +595,7 @@ uutno=0
                 fLS=0 #fLS, the last sequence from log file
 
                 logfile="event_log_uut${uutAndIps["$item"]}_${macAndIps["$item"]}.txt"
+                uutnum="${uutAndIps["$item"]}"                
 
                 #get current first and last sequence 
                 read cFS cLS < <(GetElState $item $ethIf) #2/17/2016 uncomment after GetElState is fixed
@@ -957,6 +960,9 @@ uutno=0
 	
 	        # add 4/8/2016 - clear rssi each time to get fresh data
 	        $NETMGR -g -d $item chanstats clear
+
+            # sometimes the rssi log is empty, try echo once to get some data; add on 5/5/2017
+	        $NETMGR -g -d $item echo 1
 	
 	        datetime=$(date +%Y-%m-%d,%H:%M:%S)	
             echo $datetime | tee /dev/tty | tee  >> "rssi_log_uut${uutAndIps["$item"]}_${macAndIps["$item"]}.txt"
