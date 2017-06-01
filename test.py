@@ -8,25 +8,14 @@
 #          Add AppSysvar list
 # 5/9/2016 Add Mac2IPv6
 # 11/21/2016 Add dialog to ask which interface to use
+# 5/31/2017 Add macID to sysvar.log
+#           Add ASCII to some sysvars
 
 import re
 import subprocess
 import os
 import time
 import logging
-
-logging.basicConfig(level=logging.DEBUG,
-                    format='%(asctime)s %(name)-12s %(levelname)-8s %(message)s',
-                    datefmt='%m-%d-%y %H:%M',
-                    filename='sysvars.log',
-                    filemode='a')
-formatter = logging.Formatter('%(name)-12s: %(levelname)-8s %(message)s')
-console = logging.StreamHandler()
-console.setLevel(logging.INFO)
-console.setFormatter(formatter)
-logging.getLogger('').addHandler(console)
-
-
 
 debug=0
 
@@ -81,6 +70,10 @@ class Test():
     def GetSingleSysvarValue(self, cm, ipv6, sysID):
         arg_list = ['sysvar', sysID]
         return cm(ipv6, arg_list)
+
+    def GetSingleSysvarAsciiValue(self, cm, ipv6, sysID):
+        arg_list = ['sysvar', 'ascii:%s' % sysID]
+        return cm(ipv6, arg_list)
    
     def GetAppSysvarList(self, cm, ipv6): 
         arg_list = ['app_sysvar', 'list']       
@@ -89,6 +82,7 @@ class Test():
     def GetSingleAppSysvarValue(self, cm, ipv6, sysID):
         arg_list = ['app_sysvar', sysID]
         return cm(ipv6, arg_list)
+
    
     def GetSysvarListValues(self, cm, ipv6):
         sysvarlist = self.GetSysvarList(cm, ipv6)
@@ -99,14 +93,21 @@ class Test():
         output_str = []
         output_str.append(of)
         for i in range(len(ids)):
-            sysvar_content = self.GetSingleSysvarValue(cm, ipv6, ids[i])
-            sysvar_value = re.search(r'(0x[0-9a-f]{2}:?){1,}',sysvar_content) 
+            sysvar_content = self.GetSingleSysvarValue(cm, ipv6, ids[i])            
+            sysvar_value = re.search(r'(0x[0-9a-f]{2}:?){1,}',sysvar_content)
+            sysvar_value_ascii = None     
+            if ids[i] in ['117','131','132','147', '51', '50','49']:
+                sysvar_content_ascii = self.GetSingleSysvarAsciiValue(cm, ipv6, ids[i])
+                sysvar_value_ascii = re.search(r'(?<=: ).*',sysvar_content_ascii)
             #print sysvar_content, '....'
             try:         
                 content = sysvar_value.group()
+                content_ascii = sysvar_value_ascii.group()
             except AttributeError:
                 content = sysvar_content
             of = '{0:4} - {1:30} - {2}'.format(ids[i], names[i], content)
+            if sysvar_value_ascii is not None:
+                of = of + '\n{0:37} - {1}'.format('', content_ascii)
             print of
             output_str.append(of)
         return '\n'.join(output_str)
@@ -187,9 +188,23 @@ class Test():
 if __name__ == "__main__":
     quick_test = Test(debug)
     print 'Ethernet interface: ', quick_test.GetEth()  
-    mac = raw_input('Enter MAC ID i.e. 001350fFfE12:35:f0: ')
+    mac = raw_input('Enter MAC ID i.e. 001350fffe601234: ')
+    mac = mac.replace(':','').upper()
     ipv6 = quick_test.Mac2IPv6(mac)
-    logger = logging.getLogger('%s' % mac.upper())
+
+    logging.basicConfig(level=logging.DEBUG,
+                    format='%(asctime)s %(name)-12s %(levelname)-8s %(message)s',
+                    datefmt='%m-%d-%y %H:%M',
+                    filename='sysvars_%s.log' % mac,
+                    filemode='a')
+
+    formatter = logging.Formatter('%(name)-12s: %(levelname)-8s %(message)s')
+    console = logging.StreamHandler()
+    console.setLevel(logging.INFO)
+    console.setFormatter(formatter)
+    logging.getLogger('').addHandler(console)
+
+    logger = logging.getLogger('%s' % mac)
 
     while 1:
         interface = raw_input('Do you want to use FSU(1) or ETH(2): ')
