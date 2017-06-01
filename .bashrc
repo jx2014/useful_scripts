@@ -40,3 +40,4 @@ neighdisc() {
   fsu nodeq 0 | grep ${macid: -2}
 }
 
+alias neighbor_disc=neighdisc
