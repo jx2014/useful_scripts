@@ -10,6 +10,7 @@
 # 11/21/2016 Add dialog to ask which interface to use
 # 5/31/2017 Add macID to sysvar.log
 #           Add ASCII to some sysvars
+#           Add bytes to sysvars
 
 import re
 import subprocess
@@ -93,21 +94,26 @@ class Test():
         output_str = []
         output_str.append(of)
         for i in range(len(ids)):
-            sysvar_content = self.GetSingleSysvarValue(cm, ipv6, ids[i])            
+            sysvar_content = self.GetSingleSysvarValue(cm, ipv6, ids[i])
             sysvar_value = re.search(r'(0x[0-9a-f]{2}:?){1,}',sysvar_content)
-            sysvar_value_ascii = None     
+            sysvar_value_ascii = None
+            bytes = re.search(r'\(.*\)', sysvar_content)
+            if bytes is not None:
+                bytes = bytes.group()
+            else:
+               bytes = ''
             if ids[i] in ['117','131','132','147', '51', '50','49']:
                 sysvar_content_ascii = self.GetSingleSysvarAsciiValue(cm, ipv6, ids[i])
                 sysvar_value_ascii = re.search(r'(?<=: ).*',sysvar_content_ascii)
+                content_ascii = sysvar_value_ascii.group()
             #print sysvar_content, '....'
             try:         
-                content = sysvar_value.group()
-                content_ascii = sysvar_value_ascii.group()
+                content = sysvar_value.group()                
             except AttributeError:
                 content = sysvar_content
-            of = '{0:4} - {1:30} - {2}'.format(ids[i], names[i], content)
+            of = '{0:4} - {1:35} - {2}'.format(ids[i], names[i] + ' ' + bytes, content)
             if sysvar_value_ascii is not None:
-                of = of + '\n{0:37} - {1}'.format('', content_ascii)
+                of = of + '\n{0:42} - {1}'.format('', content_ascii)
             print of
             output_str.append(of)
         return '\n'.join(output_str)
