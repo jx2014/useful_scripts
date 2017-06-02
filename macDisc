@@ -45,10 +45,11 @@
 #2/17/2017  add Ethernet interface for last gasp and event log 
 #2/21/2017  fix last gasp using 'ota'
 #4/12/2017  add uut number for each mac id, log file and print screen
-#5/5/2017   fix event log logic, add uut number to event log;
-#           add echo once after clearing rssi log
+#6/1/2017   add Null Mode
+#           add eth mode to reboot cntr
 
-ver="2017.5.5-11.37"
+
+ver="2017.6.1-17.11"
 
 GetMeterElState=0
 GetLastGaspLog=0
@@ -56,6 +57,7 @@ GetEventLog=0
 event_log_loop_timer=120
 GetLoop=0
 GetRebootLog=0
+RebootLogW="ota"
 TestGPIO=0
 GPIO_loop_timer=60 #default test GPIO every 1 minute
 GpioW="ota" #default Gpio get method is set to OTA, other method includes eth%x
@@ -74,7 +76,9 @@ GetSig=0
 GetBatteryStatus=0
 GetPing=0
 MaxEthPacketSize=8192
+NullMode=""
 debug=0
+useGwncc="-g"
 
 
 
@@ -87,7 +91,7 @@ RssiFirstRun=0
 
 
 
-while getopts "l:e:LgI:S:ErcPCht:sbvp:D" opt; do
+while getopts "l:e:Lg:GI:S:ErcPCht:sbvp:ND" opt; do
 	case "$opt" in
 	l) LastGaspLogW=${OPTARG}
 	    GetLastGaspLog=1
@@ -136,9 +140,16 @@ while getopts "l:e:LgI:S:ErcPCht:sbvp:D" opt; do
        GetPing=1
        echo "- Get IPv6 Ping: " $OPTARG
        ;;
- 	g) GetRebootLog=1
-	   echo "- Recording Reboot count and device type"
+    G) useGwncc=""
+       echo "- NOT using GWNCC"
+       ;;
+ 	g) RebootLogW=${OPTARG}
+       GetRebootLog=1
+	   echo "- Recording Reboot count and device type: " $OPTARG
 	   ;;
+    N) NullMode="-c Null"
+       echo "- Null Mode"
+       ;;
     D) debug=1
        echo "- Debug mode"
        ;;
@@ -160,11 +171,13 @@ while getopts "l:e:LgI:S:ErcPCht:sbvp:D" opt; do
  -t n (set loop timer, default is 60seconds
  -s Get FW signatures (more stringent than CRC)
  -b Get Battery status (AP/Relay only)
+ -N Null Mode
+ -G Not to use Gwncc (useful when FSU is not plugged in)
  -D debug mode
 
 Examples:
  1. logging reboot count for every 10secs for list of mac IDs in macIDs
-    \$ macDisc -Lg -t 10 macIDs.log
+    \$ macDisc -L -g 'eth6' -t 10 macIDs.log
 
  2. To test GPIOs over the air:
     \$ macDisc -I 'ota' macIDs    
@@ -182,7 +195,10 @@ Examples:
     \$ macDisc -S 'eth5' -I 'eth6' -p 'eth5' -Lgr -t 120 macIDs
 
  5. To get event log(ota), event log(ethernet), reboot count(ota) every 2mins:
-    \$ macDisc -e 'ota' -l 'eth6' -gL macIDs
+    \$ macDisc -e 'ota' -l 'eth6' -g 'ota' -L macIDs
+
+ 6. To get reboot count of a AP using ethernet, with LPO (Null Mode)
+    \$ macDisc -g 'eth6'-NGL macIDs
 
 Note:
     *1: \"eth5\" is the ethernet interface. Your enivornment may be different, 
@@ -221,13 +237,12 @@ GetImage() {
     local fw0='some fw'
     local fw1='some fw'
     
-    fw0=$($NETMGR -g -d $inputMac -t 8 image list | grep '#0' | awk '{printf $3}')
-    fw1=$($NETMGR -g -d $inputMac -t 8 image list | grep '#1' | awk '{printf $3}')
+    fw0=$($NETMGR -g -d $inputMac $NullMode -t 8 image list | grep '#0' | awk '{printf $3}')
+    fw1=$($NETMGR -g -d $inputMac $NullMode -t 8 image list | grep '#1' | awk '{printf $3}')
 
     echo "$fw0 $fw1"
 }
 
-#GetElState is not used by anything
 GetElState() {
     # function returns first sequence and last sequence of event log, with a given mac ID (ipv6)
     local item=$1
@@ -253,10 +268,10 @@ GetElState() {
     #printf "useEth: %s\n" $useEth
     if [[ $useEth == 0 ]]; then
         #printf "item: %s\n" $item
-        st=$($NETMGR -g -d $item el_data range | sed 's/[^0-9]//g')
+        st=$($NETMGR -g -d $item $NullMode el_data range | sed 's/[^0-9]//g')
     else #use ethernet interface
         #printf "item: %s\n" $item
-        st=$($NETMGR -d $item el_data range | sed 's/[^0-9]//g')
+        st=$($NETMGR -d $item $NullMode el_data range | sed 's/[^0-9]//g')
     fi
 	cls=$(echo $st | awk {'printf $1'}) #max seq
 	cfs=$(echo $st | awk {'printf $2'}) #min seq
@@ -271,7 +286,7 @@ ReadEL() {
     local useEth=$4
     local rFS="$cFS"
     local rLS=0
-    local logfile="event_log_uut${uutAndIps["$item"]}_${macAndIps["$ipv6"]}.txt"
+    local logfile="event_log_${macAndIps["$ipv6"]}.txt"
    
     #printf "ReadEL()\n"
     #printf "useEth: %s\n" $useEth
@@ -323,10 +338,10 @@ ReadEL() {
         #$NETMGR -g -d $item el_data read "$rFS" "$rLS" >> "$logfile"
         if [[ $useEth == 0 ]]; then
             #printf "FSU: %s \n" $item
-            $NETMGR -g -d $item el_data read "$rFS" "$rLS" >> "$logfile"
+            $NETMGR -g -d $item $NullMode el_data read "$rFS" "$rLS" >> "$logfile"
         else #use ethernet interface
             #printf "Eth: %s \n" $item                
-            $NETMGR -d $item el_data read "$rFS" "$rLS" >> "$logfile"               
+            $NETMGR -d $item $NullMode el_data read "$rFS" "$rLS" >> "$logfile"               
         fi
 
         #else if [ "$logtype" = "lg" ] ; then
@@ -369,6 +384,9 @@ elif [[ "$LastGaspLogW" = *"eth"* ]]; then
     ethIf=$LastGaspLogW
 elif [[ "$EventLogW" = *"eth"* ]]; then
     ethIf=$EventLogW
+elif [[ "$RebootLogW" = *"eth"* ]]; then
+    ethIf=$RebootLogW
+    printf "ethif: %s \n" $ethIf
 else
     ethIf=0
 fi
@@ -397,50 +415,53 @@ uutno=0
 
 	        # map ipv6 to macid for use to save filenames
 	        macAndIps["$ipv6"]="$line"
-            # use ipv6 to find uut number for save filenames
+            # use ipv6 to find uut number for saving filenames
             uutAndIps["$ipv6"]="$uutno"
 	
-            # ota test
-	        found=0
-	        $NETMGR -i mlme_disc_mac $macid1 &> /dev/null
-            sleep 2
-	        $NETMGR -i nodeq 0 | grep -q $macid2 && found=1
+            found=0
+            if [ "$useGwncc" = "-g" ]; then # determine if we want to use FSU(ota) or not.
 
-
-	        if [ "$found" = 1 ]; then
+                # ota test
+	            
+	            $NETMGR -i mlme_disc_mac $macid1 &> /dev/null
+                sleep 2
+	            $NETMGR -i nodeq 0 | grep -q $macid2 && found=1
+            
+	            if [ "$found" = 1 ]; then
 		
-		        #printf "Attempt to communicate with %s\n" $ipv6
-		        #bootcounter=$($NETMGR -g -d $ipv6 conf mlme mlme_reboot_cntr | sed 's/[^0-9]//g')
+		            #printf "Attempt to communicate with %s\n" $ipv6
+		            #bootcounter=$($NETMGR -g -d $ipv6 conf mlme mlme_reboot_cntr | sed 's/[^0-9]//g')
 		
-		        boot_msg=$($NETMGR -g -d $ipv6 conf mlme mlme_reboot_cntr 2>&1)
+		            boot_msg=$($NETMGR -g -d $ipv6 $NullMode conf mlme mlme_reboot_cntr 2>&1)
 	
-		        if [ "$boot_msg" != "Request timed out" ]; then 
+		            if [ "$boot_msg" != "Request timed out" ]; then 
 
-			        bootcounter=$(echo $boot_msg | grep -oP '\d*')
-			        devicetype=$($NETMGR -g -d $ipv6 sysvar 211 | grep -oP '(?<=DEVTYPE:\s).*')	
-			        devicetype=$(printf "%d" $devicetype)
+			            bootcounter=$(echo $boot_msg | grep -oP '\d*')
+			            devicetype=$($NETMGR -g -d $ipv6 $NullMode sysvar 211 | grep -oP '(?<=DEVTYPE:\s).*')	
+			            devicetype=$(printf "%d" $devicetype)
 
-			        listIPv6+=("$ipv6")
+			            listIPv6+=("$ipv6")
 
-			        printf "uut%s %s found in nodeq," "$uutno" "$macid1"
-			        printf " reboot:%4s," "$bootcounter"
-			        printf " dev_typ:%3s," "$devicetype"
+			            printf "uut%s %s found in nodeq," "$uutno" "$macid1"
+			            printf " reboot:%4s," "$bootcounter"
+			            printf " dev_typ:%3s," "$devicetype"
 
-			        printf " ipv6:%s"   "$ipv6"
+			            printf " ipv6:%s"   "$ipv6"
 
 
-			        #echo $ipv6
+			            #echo $ipv6
 			
-		        else	
-			        printf "uut%s %s OTA Request timed Out" "$uutno" "$macid1"
-			        macNotFound+=("$macid1") # macs not in fsu nodeq goes in this list.
-			        listIPv6NotFound+=("$ipv6") # ipv6 not in fsu nodeq goes in this list.
-		        fi # if [ "$boot_msg" != "Request timed out" ]; then 
-	        else
-		        printf "uut%s %s NOT found in nodeq." "$uutno" "$macid1"
-		        macNotFound+=("$macid1")
-		        listIPv6NotFound+=("$ipv6")
-	        fi # end of if [ "$found" = 1 ]; then
+		            else	
+			            printf "uut%s %s OTA Request timed Out" "$uutno" "$macid1"
+			            macNotFound+=("$macid1") # macs not in fsu nodeq goes in this list.
+			            listIPv6NotFound+=("$ipv6") # ipv6 not in fsu nodeq goes in this list.
+		            fi # if [ "$boot_msg" != "Request timed out" ]; then 
+	            else
+		            printf "uut%s %s NOT found in nodeq." "$uutno" "$macid1"
+		            macNotFound+=("$macid1")
+		            listIPv6NotFound+=("$ipv6")
+	            fi # end of if [ "$found" = 1 ]; then
+            fi # end of if [ "$useGwncc" = "-g" ]; then
 
 
             # ethernet test if any test requires ethernet
@@ -453,14 +474,16 @@ uutno=0
                 #printf "rec is::::: %s\n" $rec
 
                 if [[ $rec == 1 ]]; then #ping is Ok
-                    boot_msg=$($NETMGR -d $ipv6int conf mlme mlme_reboot_cntr 2>&1)
+                    boot_msg=$($NETMGR -d $ipv6int $NullMode conf mlme mlme_reboot_cntr 2>&1)
                     #printf "ipv6: %s\n" $ipv6
                     
                     if [ "$found" != "Request timed out" ]; then 
 
 			            bootcounter=$(echo $boot_msg | grep -oP '\d*')
-			            devicetype=$($NETMGR -d $ipv6int sysvar 211 | grep -oP '(?<=DEVTYPE:\s).*')	
-			            devicetype=$(printf "%d" $devicetype)
+                        if [[ "$NullMode" = "" ]]; then
+			                devicetype=$($NETMGR -d $ipv6int $NullMode sysvar 211 | grep -oP '(?<=DEVTYPE:\s).*')	
+			                devicetype=$(printf "%d" $devicetype)
+                        fi
                         
 			            listIPv6eth+=("$ipv6")
 
@@ -509,11 +532,11 @@ uutno=0
                 if [[ $useEth == 1 ]]; then #use ethernet interface
                     #printf "Before: $item, $ethIf\n"
                     item=$ipv6'%'$ethIf     
-                    lastGaspRecord=$($NETMGR -d $item last_gasp stat | grep total | sed 's/[^0-9]//g')
+                    lastGaspRecord=$($NETMGR -d $item $NullMode last_gasp stat | grep total | sed 's/[^0-9]//g')
                     #printf "After: $item, $ethIf\n"
                 else
                     item=$ipv6	
-                    lastGaspRecord=$($NETMGR -g -d $item last_gasp stat | grep total | sed 's/[^0-9]//g')
+                    lastGaspRecord=$($NETMGR -g -d $item $NullMode last_gasp stat | grep total | sed 's/[^0-9]//g')
                 fi
 
 		        printf "uut%s %s: Last Gasp records count: %d, retrieving......" ${uutAndIps["$ipv6"]} $item $lastGaspRecord
@@ -540,9 +563,9 @@ uutno=0
 	            do
                     #$NETMGR -g -d $item last_gasp any_rec $n >> $logfile
                     if [[ $useEth == 0 ]]; then
-                        $NETMGR -g -d $item last_gasp any_rec $n >> $logfile
+                        $NETMGR -g -d $item $NullMode last_gasp any_rec $n >> $logfile
                     else #use ethernet interface
-                        $NETMGR -d $item last_gasp any_rec $n >> $logfile
+                        $NETMGR -d $item $NullMode last_gasp any_rec $n >> $logfile
                     fi
 
                     #echo -ne "$n\r"
@@ -595,7 +618,6 @@ uutno=0
                 fLS=0 #fLS, the last sequence from log file
 
                 logfile="event_log_uut${uutAndIps["$item"]}_${macAndIps["$item"]}.txt"
-                uutnum="${uutAndIps["$item"]}"                
 
                 #get current first and last sequence 
                 read cFS cLS < <(GetElState $item $ethIf) #2/17/2016 uncomment after GetElState is fixed
@@ -801,11 +823,11 @@ uutno=0
 		                # printf "input value expected %s\n" $input_value
 	                    # sleep 1
                         if [ "$useEth" = 1 ]; then
-                    		SetOutput=$($NETMGR -d $ip -t $timeout iso_gpio set output_pin:$Output_port 2>&1)
-                    		GpioMessage=$($NETMGR -d $ip -t $timeout iso_gpio show 2>&1)		
+                    		SetOutput=$($NETMGR -d $ip $NullMode -t $timeout iso_gpio set output_pin:$Output_port 2>&1)
+                    		GpioMessage=$($NETMGR -d $ip $NullMode -t $timeout iso_gpio show 2>&1)		
                         else
-                            SetOutput=$($NETMGR -g -d $item -t $timeout iso_gpio set output_pin:$Output_port 2>&1)
-                            GpioMessage=$($NETMGR -g -d $item -t $timeout iso_gpio show 2>&1)		
+                            SetOutput=$($NETMGR -g -d $item $NullMode -t $timeout iso_gpio set output_pin:$Output_port 2>&1)
+                            GpioMessage=$($NETMGR -g -d $item $NullMode -t $timeout iso_gpio show 2>&1)		
                         fi		
 
 		                # extract input state and output state from GpioMessage output
@@ -837,9 +859,9 @@ uutno=0
 
 	                # turn off all output at end of test
                     if [ "useEth" = 1 ]; then
-                    	SetOutput1=$($NETMGR -d $ip -t $timeout iso_gpio set output_pin:0x0000) 
+                    	SetOutput1=$($NETMGR -d $ip $NullMode -t $timeout iso_gpio set output_pin:0x0000) 
                     else
-                        SetOutput1=$($NETMGR -g -d $item -t $timeout iso_gpio set output_pin:0x0000) 
+                        SetOutput1=$($NETMGR -g -d $item $NullMode -t $timeout iso_gpio set output_pin:0x0000) 
                     fi
 
                 done # end of 'for item in "${listIPv6[@]}"'
@@ -893,8 +915,8 @@ uutno=0
                     fi # enf of 'if [ -e "$SERIALPORT" ]; then'
 
                 elif [ "$SerialW" = 'ota' ]; then
-                    port0=$($NETMGR -g -d $item uart loopback_test 0:0 | grep - | sed -r 's/[0-1] - //g')
-                    port1=$($NETMGR -g -d $item uart loopback_test 1:1 | grep - | sed -r 's/[0-1] - //g')
+                    port0=$($NETMGR -g -d $item $NullMode uart loopback_test 0:0 | grep - | sed -r 's/[0-1] - //g')
+                    port1=$($NETMGR -g -d $item $NullMode uart loopback_test 1:1 | grep - | sed -r 's/[0-1] - //g')
                     
                     # test if variable are empty
                     [[ -z $port0 ]] && port0="Fail" 
@@ -932,7 +954,7 @@ uutno=0
 
 	        datetime=$(date +%Y-%m-%d,%H:%M:%S)
                 echo $datetime | tee /dev/tty | tee  >> "echo_log_uut${uutAndIps["$item"]}_${macAndIps["$item"]}.txt"
-                $NETMGR -g -d $item echo $byte_stream | tee /dev/tty | tee >> "echo_log_uut${uutAndIps["$item"]}_${macAndIps["$item"]}.txt"
+                $NETMGR -g -d $item $NullMode echo $byte_stream | tee /dev/tty | tee >> "echo_log_uut${uutAndIps["$item"]}_${macAndIps["$item"]}.txt"
 	        echo " " >> "echo_log_uut${uutAndIps["$item"]}_${macAndIps["$item"]}.txt"
 
 
@@ -946,7 +968,7 @@ uutno=0
         do
                 printf "%s\n" $item
 
-		        $NETMGR -g -d $item chanstats clear
+		        $NETMGR -g -d $item $NullMode chanstats clear
 
         done
         fi
@@ -958,19 +980,13 @@ uutno=0
         do
             printf "%s\n" $item
 	
-	        
-
-            # sometimes the rssi log is empty, try echo once to get some data; add on 5/5/2017
-	        $NETMGR -g -d $item echo 3
+	        # add 4/8/2016 - clear rssi each time to get fresh data
+	        $NETMGR -g -d $item $NullMode chanstats clear
 	
 	        datetime=$(date +%Y-%m-%d,%H:%M:%S)	
             echo $datetime | tee /dev/tty | tee  >> "rssi_log_uut${uutAndIps["$item"]}_${macAndIps["$item"]}.txt"
-	        $NETMGR -g -d $item chanstats >> "rssi_log_uut${uutAndIps["$item"]}_${macAndIps["$item"]}.txt"
+	        $NETMGR -g -d $item $NullMode chanstats >> "rssi_log_uut${uutAndIps["$item"]}_${macAndIps["$item"]}.txt"
 	        echo " " >> "rssi_log_uut${uutAndIps["$item"]}_${macAndIps["$item"]}.txt"
-
-            # add 4/8/2016 - clear rssi each time to get fresh data
-            # 5/5/2017 moved clear chanstats to the end.
-	        $NETMGR -g -d $item chanstats clear
 
         done
         fi
@@ -989,12 +1005,12 @@ uutno=0
             pingcommand='ping'
 
             # sending ping
-	        SendPing=$($NETMGR -g -d $item $pingcommand start 8.8.8.8 10 100 256)
+	        SendPing=$($NETMGR -g -d $item $NullMode $pingcommand start 8.8.8.8 10 100 256)
             sleep 1
             #echo 'SendPing ... '$SendPing
 
             # get ping result
-            PingResult=$($NETMGR -g -d $item ping list)
+            PingResult=$($NETMGR -g -d $item $NullMode ping list)
             TxPacket=$(echo $PingResult | grep -Po '(?<=\s[NY]\s)\d{1,3}(?=\s.*)')
             pattern='(?<=\s[NY]\s'$TxPacket'\s)\d{1,3}(?=\s.*)'
             RxPacket=$(echo $PingResult | grep -Po $pattern)
@@ -1006,7 +1022,7 @@ uutno=0
 	        echo $datetime',' $TxPacket',' $RxPacket >> "aping_log_uut${uutAndIps["$item"]}_${macAndIps["$item"]}.txt"
             
             # clear ping log
-            $NETMGR -g -d $item ping clear &> /dev/null
+            $NETMGR -g -d $item $NullMode ping clear &> /dev/null
 
         done
         fi # end of 'if [ "$GetPing" = 1 ]; then'
@@ -1023,8 +1039,8 @@ uutno=0
                 read fw0 fw1 < <(GetImage $item)
                 #printf "fw0 is: %s\n" $fw0
                 #printf "fw1 is: %s\n" $fw1
-		        crcresult1=$($NETMGR -g -d $item -t 8 image image_crc $fw0 2>&1 | awk '{printf $6}')
-		        crcresult2=$($NETMGR -g -d $item -t 8 image image_crc $fw1 2>&1 | awk '{printf $6}')
+		        crcresult1=$($NETMGR -g -d $item $NullMode -t 8 image image_crc $fw0 2>&1 | awk '{printf $6}')
+		        crcresult2=$($NETMGR -g -d $item $NullMode -t 8 image image_crc $fw1 2>&1 | awk '{printf $6}')
 
 			
 		        datetime=$(date +%Y-%m-%d,%H:%M:%S)
@@ -1044,7 +1060,7 @@ uutno=0
                 read fw0 fw1 < <(GetImage $item)
                 #printf "fw0 is: %s\n" $fw0
                 #printf "fw1 is: %s\n" $fw1
-		        result0=$($NETMGR -g -d $item -t 12 image image_verify_signatures $fw0 2>&1)
+		        result0=$($NETMGR -g -d $item $NullMode -t 12 image image_verify_signatures $fw0 2>&1)
                 prodkey0=$(echo "$result0" | grep 'Key')
                 DEVkey0=$(echo "$result0" | grep 'DEV key:')
                 TSTkey0=$(echo "$result0" | grep 'TST key:')
@@ -1053,7 +1069,7 @@ uutno=0
                 #TSTkey0=$(echo "$result0" | grep 'TST key:' | awk {'printf "%s %s", $4, $5'})
 
                 sleep 1
-		        result1=$($NETMGR -g -d $item -t 12 image image_verify_signatures $fw1 2>&1)
+		        result1=$($NETMGR -g -d $item $NullMode -t 12 image image_verify_signatures $fw1 2>&1)
                 prodkey1=$(echo "$result1" | grep 'Key')
                 DEVkey1=$(echo "$result1" | grep 'DEV key:')
                 TSTkey1=$(echo "$result1" | grep 'TST key:')  
@@ -1078,7 +1094,7 @@ uutno=0
 	        do
 		        #printf "%s\n" $item
 
-		        batterystatus=$($NETMGR -g -d $item -j battery status 2>&1)
+		        batterystatus=$($NETMGR -g -d $item $NullMode -j battery status 2>&1)
 			
 		        datetime=$(date +%Y-%m-%d,%H:%M:%S)
                 echo $datetime >> "battery_log_uut${uutAndIps["$item"]}_${macAndIps["$item"]}.txt"
@@ -1092,17 +1108,34 @@ uutno=0
  
 
 
-        #Get Reboot
+        #Get Reboots
         if [ "$GetRebootLog" = 1 ]; then
 	        printf "\n...Get Reboot Log...................\n"
-	        for item in "${listIPv6[@]}"
+            if [[ "$RebootLogW" = "ota" ]]; then
+    	        ipArray=("${listIPv6[@]}")
+                useGwncc="-g"
+                ethface=""
+                #printf "use GWNCC\n"
+            elif [[ "$RebootLogW" = *"eth"* ]]; then
+                ipArray=("${listIPv6eth[@]}")
+                useGwncc=""
+                ethface='%'$ethIf 
+                #printf "not to use GWNCC\n"               
+            fi
+    
+            for item in "${ipArray[@]}"
 	        do
-		        #printf "%s\n" $item
+                #printf "%s \n" $item
+                #printf "useGwncc: %s \n" $useGwncc
+                #printf "Null Mode: %s %s \n" $NullMode
 	          
 		        #date >> "reboot_log_uut${uutAndIps["$item"]}_${macAndIps["$item"]}.txt"
-		        bootcounter=$($NETMGR -g -d $item conf mlme mlme_reboot_cntr | grep -oP '[0-9]*')
-		        devicetype=$($NETMGR -g -d $item sysvar 211 | grep -oP '(?<=DEVTYPE:\s).*')
-		
+
+		        bootcounter=$($NETMGR $useGwncc -d $item$ethface $NullMode conf mlme mlme_reboot_cntr | grep -oP '[0-9]*')
+                if [[ "$NullMode" = "" ]]; then
+    		        devicetype=$($NETMGR $useGwncc -d $item$ethface $NullMode sysvar 211 | grep -oP '(?<=DEVTYPE:\s).*')
+                fi
+ 		
 		        devicetype=$(printf "%d\n" $devicetype)	
 			
 		        datetime=$(date +%Y-%m-%d,%H:%M:%S)
@@ -1120,6 +1153,7 @@ uutno=0
 		        echo "$datetime, $item, $bootcounter, " | tee /dev/tty |tee >> "reboot_log_uut${uutAndIps["$item"]}_${macAndIps["$item"]}.txt"
 	        done
         fi # end of 'if [ "$GetRebootLog" = 1 ]; then'
+
 
     printf "\n....not found in nodeq...........\n"
     #for item in ${macNotFound[@]}
