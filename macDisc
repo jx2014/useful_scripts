@@ -47,9 +47,9 @@
 #4/12/2017  add uut number for each mac id, log file and print screen
 #6/1/2017   add Null Mode
 #           add eth mode to reboot cntr
+#6/14/2017  add rf_ping test
 
-
-ver="2017.6.1-17.11"
+ver="2017.6.14-19.43"
 
 GetMeterElState=0
 GetLastGaspLog=0
@@ -79,6 +79,7 @@ MaxEthPacketSize=8192
 NullMode=""
 debug=0
 useGwncc="-g"
+GetRfPing=0
 
 
 
@@ -91,7 +92,7 @@ RssiFirstRun=0
 
 
 
-while getopts "l:e:Lg:GI:S:ErcPCht:sbvp:ND" opt; do
+while getopts "l:e:Lg:GI:S:ErRcPCht:sbvp:ND" opt; do
 	case "$opt" in
 	l) LastGaspLogW=${OPTARG}
 	    GetLastGaspLog=1
@@ -150,6 +151,9 @@ while getopts "l:e:Lg:GI:S:ErcPCht:sbvp:ND" opt; do
     N) NullMode="-c Null"
        echo "- Null Mode"
        ;;
+    R) GetRfPing=1
+       echo "- rf_ping test"
+       ;;
     D) debug=1
        echo "- Debug mode"
        ;;
@@ -173,6 +177,7 @@ while getopts "l:e:Lg:GI:S:ErcPCht:sbvp:ND" opt; do
  -b Get Battery status (AP/Relay only)
  -N Null Mode
  -G Not to use Gwncc (useful when FSU is not plugged in)
+ -R get RF_Ping
  -D debug mode
 
 Examples:
@@ -227,6 +232,7 @@ fi
 
 
 NETMGR=/home/ssnuser/work/net_mgr
+RFPING=/home/ssnuser/work/rf_ping
 SERIALPORT=/home/ssnuser/work/serialPort
 t1=0
 chars="/-\|"
@@ -242,6 +248,7 @@ GetImage() {
 
     echo "$fw0 $fw1"
 }
+
 
 GetElState() {
     # function returns first sequence and last sequence of event log, with a given mac ID (ipv6)
@@ -990,7 +997,20 @@ uutno=0
 
         done
         fi
+    
+        #Get RF Ping
+        if [ "$GetRfPing" = 1 ]; then
+        printf "\n...Get Rf Ping................\n"
+        for item in "${listIPv6[@]}"
+        do
+            printf "%s\n" $item
 
+	        datetime=$(date +%Y-%m-%d,%H:%M:%S)	
+            echo $datetime | tee /dev/tty | tee  -a "rfping_log_uut${uutAndIps["$item"]}_${macAndIps["$item"]}.txt"
+	        $RFPING -i ${macAndIps["$item"]} -c 1 | tee -a  "rfping_log_uut${uutAndIps["$item"]}_${macAndIps["$item"]}.txt"
+
+        done
+        fi
 
         # AP modem ping 8.8.8.8 google 5/19/2016
         if [ "$GetAPing" = 1 ]; then
