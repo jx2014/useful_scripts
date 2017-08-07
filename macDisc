@@ -50,8 +50,8 @@
 #6/14/2017  add rf_ping test
 #8/7/2017   fix el range for both NIC and AP
 #           add el_log uut number
-
-ver="2017.8.7-12.35"
+#           fix el read
+ver="2017.8.7-13.25"
 
 GetMeterElState=0
 GetLastGaspLog=0
@@ -82,6 +82,7 @@ NullMode=""
 debug=0
 useGwncc="-g"
 GetRfPing=0
+
 
 
 
@@ -259,6 +260,7 @@ GetElState() {
     local cfs=0
     local cls=0
     local useEth=$2
+    local meterEl=0
     # cfs - current first sequence, cls - current last sequence
 
     # function return event log first sequence and last sequence
@@ -278,19 +280,30 @@ GetElState() {
     if [[ $useEth == 0 ]]; then
         #printf "item: %s\n" $item
         st=$($NETMGR -g -d $item $NullMode el_data range | sed 's/[^0-9]//g')
+        meterEl=0
         if [ -z "$st" ]; then
             st=$($NETMGR -g -d $item $NullMode meter_el_state | sed 's/[^0-9]//g')
+            meterEl=1
         fi
     else #use ethernet interface
         #printf "item: %s\n" $item
         st=$($NETMGR -d $item $NullMode el_data range | sed 's/[^0-9]//g')
+        meterEl=0
         if [ -z "$st" ]; then
             st=$($NETMGR -g -d $item $NullMode meter_el_state | sed 's/[^0-9]//g')
+            meterEl=1
         fi
     fi
-	cls=$(echo $st | awk {'printf $1'}) #max seq
-	cfs=$(echo $st | awk {'printf $2'}) #min seq
-    echo "$cfs $cls"
+
+    if [[ $meterEl == 0 ]]; then
+    	cls=$(echo $st | awk {'printf $1'}) #max seq
+	    cfs=$(echo $st | awk {'printf $2'}) #min seq
+    elif [[ $meterEl == 1 ]]; then
+        cfs=$(echo $st | awk {'printf $1'}) #max seq
+	    cls=$(echo $st | awk {'printf $2'}) #min seq
+    fi
+
+    echo "$cfs $cls" "$meterEl"
 }
 
 ReadEL() {
@@ -299,6 +312,7 @@ ReadEL() {
     local cFS=$2
     local cLS=$3
     local useEth=$4
+    local meterEl=$5
     local rFS="$cFS"
     local rLS=0
     #local logfile="event_log_${macAndIps["$ipv6"]}.txt"
@@ -352,12 +366,24 @@ ReadEL() {
         # the following works for AP/Relay as well as  meter NICs; besure to change event_log looping func
 
         #$NETMGR -g -d $item el_data read "$rFS" "$rLS" >> "$logfile"
-        if [[ $useEth == 0 ]]; then
-            #printf "FSU: %s \n" $item
-            $NETMGR -g -d $item $NullMode el_data read "$rFS" "$rLS" >> "$logfile"
-        else #use ethernet interface
-            #printf "Eth: %s \n" $item                
-            $NETMGR -d $item $NullMode el_data read "$rFS" "$rLS" >> "$logfile"               
+
+        # test to see if el_data works or not:
+        if [[ $meterEl == 0 ]]; then
+            if [[ $useEth == 0 ]]; then
+                #printf "FSU: %s \n" $item
+                $NETMGR -g -d $item $NullMode el_data read "$rFS" "$rLS" >> "$logfile"
+            else #use ethernet interface
+                #printf "Eth: %s \n" $item                
+                $NETMGR -d $item $NullMode el_data read "$rFS" "$rLS" >> "$logfile"               
+            fi
+        elif [[ $meterEl == 1 ]]; then
+            if [[ $useEth == 0 ]]; then
+                #printf "FSU: %s \n" $item
+                $NETMGR -g -d $item $NullMode gmi nic_el_read "$rFS":"$rLS" >> "$logfile"
+            else #use ethernet interface
+                #printf "Eth: %s \n" $item                
+                $NETMGR -d $item $NullMode gmi nic_el_read "$rFS":"$rLS" >> "$logfile"               
+            fi
         fi
 
         #else if [ "$logtype" = "lg" ] ; then
@@ -636,10 +662,10 @@ uutno=0
                 logfile="event_log_uut${uutAndIps["$item"]}_${macAndIps["$item"]}.txt"
 
                 #get current first and last sequence 
-                read cFS cLS < <(GetElState $item $ethIf) #2/17/2016 uncomment after GetElState is fixed
+                read cFS cLS meterEl < <(GetElState $item $ethIf) #2/17/2016 uncomment after GetElState is fixed
                 #GetElState $item $ethIf
                 #debug
-                if [[ $debug == 1 ]]; then printf "NIC event log seq range (cFS to cLS): $cFS to $cLS\n"; fi
+                if [[ $debug == 1 ]]; then printf "NIC event log seq range (cFS to cLS): $cFS to $cLS; meterEl flag: $meterEl\n"; fi
                 let rLS=$cLS
 
                 #check if event log file already exists:
@@ -658,11 +684,11 @@ uutno=0
 
                     if [[ $cLS > $fLS ]]; then #event log sequence from NIC is > from file
                         let rFS=$fLS+1 # set sequence to be read to last sequence from file + 1
-                        ReadEL $item $rFS $rLS $useEth
+                        ReadEL $item $rFS $rLS $useEth $meterEl
 
                     elif [[ $fLS > $cLS ]]; then # if for some reason, the event log sequence from file is > from NIC, then read from the beginning
                         let rFS=$cFS # set sequence to be read to first sequence from NIC
-                        ReadEL $item $rFS $rLS $useEth
+                        ReadEL $item $rFS $rLS $useEth $meterEl
 
                     elif [[ $fLS == $cLS ]]; then # if event log sequence from file is == from NIC, then do not do anything
                         continue
@@ -671,7 +697,7 @@ uutno=0
                     # event log doens't exist, then read from first sequence to last sequence, 30 entries at a time.
                     if [[ $debug == 1 ]]; then printf "log file doesn't exist, create a new one\n"; fi
                     let rFS=$cFS
-                    ReadEL $item $rFS $rLS $useEth
+                    ReadEL $item $rFS $rLS $useEth $meterEl
                 fi
                 printf "uut%s, %s, first seq: $rFS, last seq: $rLS\n" ${uutAndIps["$item"]} $item 
             done
