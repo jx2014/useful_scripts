@@ -11,20 +11,23 @@
 # 5/31/2017 Add macID to sysvar.log
 #           Add ASCII to some sysvars
 #           Add bytes to sysvars
+# 8/12/2017 Add nodeq, certs, 
 
 import re
 import subprocess
+from subprocess import PIPE, STDOUT
 import os
 import time
 import logging
 
 debug=0
 
-class Test():
-    def __init__(self, debug=1):        
+class Test(object):
+    def __init__(self, debug=1, timeout=8):        
         self.NETMGR = r"/home/ssnuser/work/net_mgr"
-        self.fsu = self.NETMGR + ' -d'
-        self.nic = self.NETMGR + ' -g -d'
+        self.fsu = self.NETMGR + ' -t %s -d' % timeout
+        self.nic = self.NETMGR + ' -t %s -g -d' % timeout
+        self.timeout = str(timeout)
         subprocess.call([self.NETMGR, "-V"])
         self.eth = self.GetEth()
         
@@ -39,10 +42,11 @@ class Test():
             return None
     
     def CallEth(self, ipv6, arg_list):
-        args = [self.NETMGR, '-d', ipv6+'%'+self.eth] + arg_list
+        args = [self.NETMGR, '-t', self.timeout, '-d', ipv6+'%'+self.eth] + arg_list
         try:        
             if self.eth is not None:
-                output = subprocess.check_output(args)
+                p = subprocess.Popen(args, stdout=PIPE, stderr=STDOUT)
+                output = p.stdout.read()
             else:
                 print 'Can not find eth interface'
         except subprocess.CalledProcessError, Argument:        
@@ -51,10 +55,11 @@ class Test():
             return output
 
     def CallFsu(self, ipv6, arg_list):
-        args = [self.NETMGR, '-g', '-d', ipv6] + arg_list
+        args = [self.NETMGR, '-t', self.timeout, '-g', '-d', ipv6] + arg_list
         try:
-            output = subprocess.check_output(args)        
-        except subprocess.CalledProcessError, Argument:               
+            p = subprocess.Popen(args, stdout=PIPE, stderr=STDOUT)
+            output = p.stdout.read()        
+        except subprocess.CalledProcessError as exc:               
             print Argument
         else:
             return output
@@ -78,6 +83,18 @@ class Test():
    
     def GetAppSysvarList(self, cm, ipv6): 
         arg_list = ['app_sysvar', 'list']       
+        return cm(ipv6, arg_list)
+
+    def GetNodeq(self, cm, ipv6):
+        arg_list = ['nodeq', '0']       
+        return cm(ipv6, arg_list)
+
+    def GetCerts(self, cm, ipv6):
+        arg_list = ['certs', 'sdump', '4']       
+        return cm(ipv6, arg_list)
+
+    def GetCertsOwn(self, cm, ipv6):
+        arg_list = ['certs', 'own']
         return cm(ipv6, arg_list)
     
     def GetSingleAppSysvarValue(self, cm, ipv6, sysID):
@@ -150,6 +167,40 @@ class Test():
     def GetHWinfo(self, cm, ipv6):
         arg_list = ['hw_info', 'show']
         return cm(ipv6, arg_list)
+
+    def SetBoot(self, cm, ipv6, LastKnownGood, CurrentImage):
+        arg_list = ['image', 'setboot', LastKnownGood, CurrentImage]
+        return cm(ipv6, arg_list)
+
+    def SetRestart(self, cm, ipv6):
+        arg_list = ['restart', 'now']
+        return cm(ipv6, arg_list)
+
+    def RemoveAppSysvar(self, cm, ipv6, appsysvar):
+        arg_list = ['app_sysvar', 'delete:%s' % appsysvar ]
+        return cm(ipv6, arg_list)
+
+    def getFW(self, imagelist, image='mutt'):
+        '''
+            getImage(image='mutt')
+            or
+            getImage(image='prod')
+        '''
+        image0 = re.search('(?<=0:\s)\d{2}\.\d{2}\.[a-f|0-9]{4}', imagelist)
+        image1 = re.search('(?<=1:\s)\d{2}\.\d{2}\.[a-f|0-9]{4}', imagelist)
+        if image == 'mutt':
+            imageFlag = '8'
+        else:
+            imageFlag = '0'
+
+        want_image = None
+
+        if image0.group()[0:1] == imageFlag:
+            want_image = image0.group()
+        elif image1.group()[0:1] == imageFlag:
+            want_image = image1.group()
+
+        return want_image
  
     def Mac2IPv6(self, mac):
         '''
