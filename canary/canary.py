@@ -94,8 +94,10 @@ def main():
                 writeWarningFile('=========canary node q before contamination was detected=========', 'a')
                 writeWarningFile(cleanNodeq, 'a')
                 removeCerts()
-            else:
-                print 'Found appsysvar 360 in canary device, previous alert has not been acknowledged.'
+            else:                
+                print '%s - Found appsysvar 360 in canary device, previous alert has not been acknowledged.' % time.ctime()
+                while os.path.exists(warning_filepath):
+                    time.sleep(10)
         else:
             print 'unknown error, re-try in 1 minute'
             time.sleep(60)
