@@ -175,8 +175,7 @@ class UIQ_Duration(object):
         print "# of Mac IDs processed: %s" % n
     
 if __name__ == '__main__':
-    input_csv = r"C:\Users\jxue\Documents\Projects_LocalDrive\APRelay_RMA_Reduction\Lorenzo\Copy of backbone-device-history.csv"
-    
+    input_csv = r"C:\Users\jxue\Documents\Projects_LocalDrive\APRelay_RMA_Reduction\Lorenzo\AP_RMA_backbone-device-history.csv"    
     UIQStates = UIQ_Duration(input_csv)
     #UIQStates.get_state_date(UIQStates.complete_csv_file[4])
     UIQStates.run()
