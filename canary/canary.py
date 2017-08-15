@@ -74,13 +74,18 @@ def removeCerts():
     
 def main():
     while True:
-        nodeq = cleanNodeq = canary.GetNodeq(intf, ipv6)
+        nodeq = canary.GetNodeq(intf, ipv6)
+        appsysvarList = canary.GetAppSysvarList(intf, ipv6)       
         
-        if '360' not in canary.GetAppSysvarList(intf, ipv6):
+        if 'timed out' in appsysvarList:
+            print 'Unable to communicate with UUT, re-try in 1 minute'
+            time.sleep(60)
+            continue
+        elif '360' not in appsysvarList:
             print '%s - No RF contamination detected, checking again in %s minutes' % (time.ctime(), int(check_interval / 60))
             cleanNodeq = nodeq
             time.sleep(check_interval)
-        elif '360' in canary.GetAppSysvarList(intf, ipv6):           
+        elif '360' in appsysvarList:           
             if not os.path.exists(warning_filepath):
                 warning_msg = 'RF Contamination Detected at %s\n' % time.ctime()
                 print warning_msg
