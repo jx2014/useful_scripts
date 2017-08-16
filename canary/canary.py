@@ -56,7 +56,7 @@ def boot2image(fwimage='mutt'):
                 time.sleep(5)                
                 print '...checking if uut booted properly:'
                 print checkboot
-            print '...resume RF contamination check...'
+            print '...successfully booted to %s mode...' % fwimage
         else:
             print '...no image to boot %s' % imagelist
     else:
@@ -64,19 +64,18 @@ def boot2image(fwimage='mutt'):
 
 
 def removeCerts():
-    boot2image('mutt')
     checkRemoval = ' '
     while 'Ok' not in checkRemoval:    
         checkRemoval = canary.RemoveAppSysvar(intf, ipv6, 360)
         print '...removing appsysvar 360 ... %s' % checkRemoval
         time.sleep(1)
-    boot2image('prod')
+    
     
 def main():
     while True:
         nodeq = canary.GetNodeq(intf, ipv6)
         appsysvarList = canary.GetAppSysvarList(intf, ipv6)       
-        
+        cleanNodeq = 'n/a'
         if 'timed out' in appsysvarList:
             print 'Unable to communicate with UUT, re-try in 1 minute'
             time.sleep(60)
@@ -92,13 +91,19 @@ def main():
                 print 'Check log file: %s' % warning_filepath
                 writeWarningFile(warning_msg)
                 writeWarningFile(nodeq, 'a')
-                writeWarningFile(canary.GetAppSysvarList(intf, ipv6), 'a')
+                writeWarningFile(canary.GetAppSysvarList(intf, ipv6), 'a')                
                 writeWarningFile(canary.GetCerts(intf, ipv6), 'a')
                 writeWarningFile(canary.GetCertsOwn(intf, ipv6), 'a')
                 writeWarningFile(canary.GetNetID(intf, ipv6), 'a')
+                boot2image('mutt')
+                writeWarningFile(canary.GetSingleAppSysvarValue(intf, ipv6, '360'), 'a')
                 writeWarningFile('=========canary node q before contamination was detected=========', 'a')
                 writeWarningFile(cleanNodeq, 'a')
+                print '%s - Awaiting for alert to be acknowledged.' % time.ctime()
+                while os.path.exists(warning_filepath):
+                    time.sleep(10)
                 removeCerts()
+                boot2image('prod')
             else:                
                 print '%s - Found appsysvar 360 in canary device, previous alert has not been acknowledged.' % time.ctime()
                 while os.path.exists(warning_filepath):
@@ -107,6 +112,7 @@ def main():
             print 'unknown error, re-try in 1 minute'
             time.sleep(60)
 
+            
             
              
     
