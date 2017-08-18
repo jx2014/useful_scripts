@@ -51,7 +51,9 @@
 #8/7/2017   fix el range for both NIC and AP
 #           add el_log uut number
 #           fix el read
-ver="2017.8.7-13.25"
+#8/18/2017  fix el log read from file logic
+
+ver="2017.8.18-12.02"
 
 GetMeterElState=0
 GetLastGaspLog=0
@@ -256,12 +258,12 @@ GetImage() {
 GetElState() {
     # function returns first sequence and last sequence of event log, with a given mac ID (ipv6)
     local item=$1
-    local st
-    local cfs=0
-    local cls=0
+    local st     # meter_el_state or el_data range
+    local cfs=0  # cfs - current first sequence
+    local cls=0  # cls - current last sequence
     local useEth=$2
-    local meterEl=0
-    # cfs - current first sequence, cls - current last sequence
+    local meterEl=0  # by default, use el_data range, if fails, meterEL=1, and use meter_el_state
+                     # which one works and which one fails is FW/Device Type dependent - from personal experience.   
 
     # function return event log first sequence and last sequence
     
@@ -333,7 +335,7 @@ ReadEL() {
     while (( $n <= $m ))
     do
         # the last squence to be read, is equal to the first sequence + i entries
-        # i.e. if want to read sequence 10 to 105, then the first time read will be from 10 to 40
+        # e.g. if want to read sequence 10 to 105, then the first time read will be from 10 to 40
         # next read will be from 41 to 71 and so on. 
         # The reason is nic_el_read can only read so many logs at once depending on the size of each event entries. 
         # 30 is randomly selected for best practice.
@@ -347,8 +349,8 @@ ReadEL() {
         # rFS  10   41    72   103
         # rLS  40   71   102   105
 
-        let "n=$n+1"	# 1, 2, 3, 4
-        let "rLS=$rFS+i" # 40, 71, 102, 133
+        let "n=$n+1"	# e.g. 1, 2, 3, 4
+        let "rLS=$rFS+i" # e.g. 40, 71, 102, 133
         
         #for debug
         if [[ $debug == 1 ]]; then printf "n:$n, m:$m, rFS:$rFS, rLS:$rLS, cFS:$cFS, cLS:$cLS\n"; fi
@@ -653,40 +655,52 @@ uutno=0
 
                 let t1=$t0+$event_log_loop_timer                
                         
-                cFS=0 #cFS, cLS, current sequences from NIC
-                cLS=0
-                rFS=0 #rFS, rLS, sequences to be read
-                rLS=0
+                cFS=0 #cFS, current first sequence from NIC
+                cLS=0 #cLS, current last sequence from NIC
+                rFS=0 #rFS, first sequence to be read
+                rLS=0 #rLS, last sequence to be read
                 fLS=0 #fLS, the last sequence from log file
 
                 logfile="event_log_uut${uutAndIps["$item"]}_${macAndIps["$item"]}.txt"
 
-                #get current first and last sequence 
+                #get current first and last sequence from NIC
                 read cFS cLS meterEl < <(GetElState $item $ethIf) #2/17/2016 uncomment after GetElState is fixed
-                #GetElState $item $ethIf
-                #debug
+                
                 if [[ $debug == 1 ]]; then printf "NIC event log seq range (cFS to cLS): $cFS to $cLS; meterEl flag: $meterEl\n"; fi
+                
+                # by default, we want the last sequence to be read to be the last sequence available in the NIC
                 let rLS=$cLS
 
                 #check if event log file already exists:
                 if [ -e "$logfile" ]; then
                     # last sequence from existing log file
+
+                    # we don't know if last sequence format is in 'seq' or 'seqnum', so need to try both
                     
                     # the following works if the event log is saved by gmi nic_el_read a;b
-                    #fLS=$(tac "$logfile" | grep -m 1 '  seq' | awk '{printf $2}' | sed 's|,||g')
-
+                    fLS_seq=$(tac "$logfile" | grep -m 1 '  seq' | awk '{printf $2}' | sed 's|,||g')
+                    let fLS_seq=$fLS_seq+0 #convert none to 0
+                    
                     # the following works if the event log is saved by el_data read
-                    fLS=$(tac "$logfile" | grep -m 1 ' seqnum' | awk '{printf $3}' | sed 's|,||g')
-
-                    #debug
+                    fLS_seqnum=$(tac "$logfile" | grep -m 1 ' seqnum' | awk '{printf $3}' | sed 's|,||g')
+                    let fLS_seqnum=$fLS_seqnum+0 #convert none to 0
+                    
                     if [[ $debug == 1 ]]; then printf "event log file last sequence (fLS) is $fLS\n"; fi
-                    let fLS=$fLS+0 # if there is none, then set the last sequence from file to 0
+
+                    if [[ $fLS_seq > 0 ]]; then
+                        let fLS=$fLS_seq
+                    elif [[ $fLS_seqnum > 0 ]]; then
+                        let fLS=$fLS_seqnum
+                    else
+                        let fLS=0 # if all of above fails, then set last sequnce to read to 0
+                    fi
 
                     if [[ $cLS > $fLS ]]; then #event log sequence from NIC is > from file
                         let rFS=$fLS+1 # set sequence to be read to last sequence from file + 1
                         ReadEL $item $rFS $rLS $useEth $meterEl
 
                     elif [[ $fLS > $cLS ]]; then # if for some reason, the event log sequence from file is > from NIC, then read from the beginning
+                                                 # usually this means event log in NIC has rolled over.
                         let rFS=$cFS # set sequence to be read to first sequence from NIC
                         ReadEL $item $rFS $rLS $useEth $meterEl
 
