@@ -51,9 +51,7 @@
 #8/7/2017   fix el range for both NIC and AP
 #           add el_log uut number
 #           fix el read
-#8/18/2017  fix el log read from file logic
-
-ver="2017.8.18-12.02"
+ver="2017.8.7-13.25"
 
 GetMeterElState=0
 GetLastGaspLog=0
