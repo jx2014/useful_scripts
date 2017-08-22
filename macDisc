@@ -52,8 +52,9 @@
 #           add el_log uut number
 #           fix el read
 #8/18/2017  fix el log read from file logic
+#8/22/2017  modify event log debug message 
 
-ver="2017.8.18-12.02"
+ver="2017.8.22-13.30"
 
 GetMeterElState=0
 GetLastGaspLog=0
@@ -440,7 +441,7 @@ uutno=0
     while IFS='' read -r line || [[ -n "$line" ]]; do
         #while IFS= read -r line; do
         let "uutno=uutno+1" #will append this uut number to each mac ID
-        if [[ $debug == 1 ]]; then printf $line; fi
+        if [[ $debug == 1 ]]; then printf "$line\n"; fi
         [ "${line:0:1}" = "#" ] && continue
         size=${#line}
         if [ $size -eq 16 ]; then #each mac ID is 16 characters long, anything short than that will be discarded
@@ -685,8 +686,6 @@ uutno=0
                     fLS_seqnum=$(tac "$logfile" | grep -m 1 ' seqnum' | awk '{printf $3}' | sed 's|,||g')
                     let fLS_seqnum=$fLS_seqnum+0 #convert none to 0
                     
-                    if [[ $debug == 1 ]]; then printf "event log file last sequence (fLS) is $fLS\n"; fi
-
                     if [[ $fLS_seq > 0 ]]; then
                         let fLS=$fLS_seq
                     elif [[ $fLS_seqnum > 0 ]]; then
@@ -694,6 +693,16 @@ uutno=0
                     else
                         let fLS=0 # if all of above fails, then set last sequnce to read to 0
                     fi
+
+
+
+                    if [[ $debug == 1 ]]; then
+                        printf "fLS_seq: $fLS_seq\n";
+                        printf "fLS_seqnum: $fLS_seqnum\n";
+                        printf "event log file last sequence (fLS) is $fLS\n"; 
+                    fi
+
+
 
                     if [[ $cLS > $fLS ]]; then #event log sequence from NIC is > from file
                         let rFS=$fLS+1 # set sequence to be read to last sequence from file + 1
