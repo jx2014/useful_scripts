@@ -53,8 +53,10 @@
 #           fix el read
 #8/18/2017  fix el log read from file logic
 #8/22/2017  modify event log debug message 
+#8/29/2017  add fsu reboot (not completed, yet)
+#8/30/2017  add timeout to aping 8secs
 
-ver="2017.8.22-13.30"
+ver="2017.8.39-20.00"
 
 GetMeterElState=0
 GetLastGaspLog=0
@@ -85,6 +87,7 @@ NullMode=""
 debug=0
 useGwncc="-g"
 GetRfPing=0
+GetFSUReboot=0
 
 
 
@@ -98,7 +101,7 @@ RssiFirstRun=0
 
 
 
-while getopts "l:e:Lg:GI:S:ErRcPCht:sbvp:ND" opt; do
+while getopts "l:e:Lg:GI:S:ErRcPCht:sbvp:NDF" opt; do
 	case "$opt" in
 	l) LastGaspLogW=${OPTARG}
 	    GetLastGaspLog=1
@@ -163,6 +166,9 @@ while getopts "l:e:Lg:GI:S:ErRcPCht:sbvp:ND" opt; do
     D) debug=1
        echo "- Debug mode"
        ;;
+    F) GetFSUReboot=1
+       echo "- FSU reboots every 1 hour"
+       ;;
     h)
        printf "Avaliable options:
  -l Get Last Gasp Log, use '-l ethx' to use ethernet interface.
@@ -184,6 +190,7 @@ while getopts "l:e:Lg:GI:S:ErRcPCht:sbvp:ND" opt; do
  -N Null Mode
  -G Not to use Gwncc (useful when FSU is not plugged in)
  -R get RF_Ping
+ -F FSU reboots every 1 hour
  -D debug mode
 
 Examples:
@@ -1083,12 +1090,12 @@ uutno=0
             pingcommand='ping'
 
             # sending ping
-	        SendPing=$($NETMGR -g -d $item $NullMode $pingcommand start 8.8.8.8 10 100 256)
+	        SendPing=$($NETMGR -g -d $item $NullMode -t 8 $pingcommand start 8.8.8.8 10 100 256)
             sleep 1
             #echo 'SendPing ... '$SendPing
 
             # get ping result
-            PingResult=$($NETMGR -g -d $item $NullMode ping list)
+            PingResult=$($NETMGR -g -d $item $NullMode -t 8 ping list)
             TxPacket=$(echo $PingResult | grep -Po '(?<=\s[NY]\s)\d{1,3}(?=\s.*)')
             pattern='(?<=\s[NY]\s'$TxPacket'\s)\d{1,3}(?=\s.*)'
             RxPacket=$(echo $PingResult | grep -Po $pattern)
@@ -1100,7 +1107,7 @@ uutno=0
 	        echo $datetime',' $TxPacket',' $RxPacket >> "aping_log_uut${uutAndIps["$item"]}_${macAndIps["$item"]}.txt"
             
             # clear ping log
-            $NETMGR -g -d $item $NullMode ping clear &> /dev/null
+            $NETMGR -g -d $item $NullMode -t 8 ping clear &> /dev/null
 
         done
         fi # end of 'if [ "$GetPing" = 1 ]; then'
