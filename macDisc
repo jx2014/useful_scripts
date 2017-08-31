@@ -55,8 +55,9 @@
 #8/22/2017  modify event log debug message 
 #8/29/2017  add fsu reboot (not completed, yet)
 #8/30/2017  add timeout to aping 8secs
+#           add fsu reboot every 3600secs
 
-ver="2017.8.39-20.00"
+ver="2017.8.30-20.30"
 
 GetMeterElState=0
 GetLastGaspLog=0
@@ -250,6 +251,7 @@ SERIALPORT=/home/ssnuser/work/serialPort
 t1=0
 chars="/-\|"
 sc=0
+let fsu_restart_t1=$(date +%s)
 
 GetImage() {
     local inputMac=$1
@@ -444,6 +446,24 @@ else
 fi
 
 date
+
+    #restart FSU every 60minutes
+    #we want to do this at the beginning of reading mac IDs so to get a clean start...hopefully.
+    if [ "$GetFSUReboot" = 1 ]; then
+        fsu_restart_t0=$(date +%s)
+        printf "\n...FSU restart.....................\n"
+        if (( "$fsu_restart_t0" >= "$fsu_restart_t1" )); then
+            $NETMGR -i restart now
+            let fsu_restart_t1=$fsu_restart_t0+3600
+            printf "rebooting FSU, wait 30 seconds\n\n"
+            sleep 30
+        else
+            printf "%s secs until next FSU reboot\n" $[fsu_restart_t0-fsu_restart_t1]
+        fi
+
+    fi
+
+
 uutno=0
     while IFS='' read -r line || [[ -n "$line" ]]; do
         #while IFS= read -r line; do
@@ -798,7 +818,7 @@ uutno=0
 
             t0=$(date +%s)
             printf "\n...GPIO Test...................\n"
-            if [[ $t0 > $t_gpio_1 ]]; then
+            if (( "$t0" > "$t_gpio_1" )); then
                 let t_gpio_1=$t0+$GPIO_loop_timer                
                 for item in "${ipArray[@]}"
                 do
@@ -1188,10 +1208,6 @@ uutno=0
 
 	        done
         fi
-
-
- 
-
 
         #Get Reboots
         if [ "$GetRebootLog" = 1 ]; then
