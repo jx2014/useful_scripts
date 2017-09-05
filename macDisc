@@ -56,8 +56,10 @@
 #8/29/2017  add fsu reboot (not completed, yet)
 #8/30/2017  add timeout to aping 8secs
 #           add fsu reboot every 3600secs
+#9/05/2017  modify fsu reboot timer to 1800 secs, and sleep 60secs after
 
-ver="2017.8.30-20.30"
+
+ver="2017.9.5-12.30"
 
 GetMeterElState=0
 GetLastGaspLog=0
@@ -454,9 +456,9 @@ date
         printf "\n...FSU restart.....................\n"
         if (( "$fsu_restart_t0" >= "$fsu_restart_t1" )); then
             $NETMGR -i restart now
-            let fsu_restart_t1=$fsu_restart_t0+3600
-            printf "rebooting FSU, wait 30 seconds\n\n"
-            sleep 30
+            let fsu_restart_t1=$fsu_restart_t0+1800
+            printf "rebooting FSU, wait 60 seconds\n\n"
+            sleep 60
         else
             printf "%s secs until next FSU reboot\n" $[fsu_restart_t0-fsu_restart_t1]
         fi
