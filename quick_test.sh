@@ -5,9 +5,9 @@ listIPv6=()
 #arg='iso_gpio show' 
 #grep='Input state:'
 #arg='nodeq 0'
-#arg='image setboot 4.0.6001 4.0.6001'
+#arg='image setboot 4.2.6001 4.2.6001 force'
 #arg='image list'
-#arg='image remove 84.0.6000'
+#arg='image remove 84.2.6000'
 #arg='image upload firmware'
 #arg='get_version_str'
 #arg='conf mlme mlme_mac_net_id' #netID
@@ -29,12 +29,14 @@ arg='conf mlme mlme_reboot_cntr'
 #arg='sysif show eth0'
 #arg='sysvar 199:0x01'
 #arg='sysvar 200:0x05:0x00:0x00:0x00'
+#arg='sysvar 200:0x00:0x00:0x00:0x00'
 #arg='sysvar 201:0x1d:0x00:0x00:0x00'
 #arg='sysvar 202:0x22:0x00:0x00:0x00'
 #arg='sysvar ascii:51:16:8.8.8.8'
 #arg='sysvar 200'
 #arg='sysvar 201'
 #arg='sysvar 202'
+#arg='sysvar 437'
 #arg='sysvar ascii:51'
 #arg='sysvar delete:775'
 #arg='trnet show log'
@@ -52,7 +54,7 @@ arg='conf mlme mlme_reboot_cntr'
 #arg='conf mac mac_pv_rssi'
 ####### lua script #######
 #arg='lua config list'
-#arg='lua config upload_init vars_noCH.lua ~/work/project/AP-5.0-ALT/Lua/vars_noCH_from_MichaelLee.lua'
+#arg='lua config upload_init vars_file_vrz6.lua /home/ssnuser/work/project/ALT-uAP-Gen5-Pre/lua/verizon/vars_file_vrz6.lua'
 #arg='lua config upload_init vars_noCH.lua ./vars_noCH_from_MichaelLee.lua'
 #arg='lua config verify vars_noCH.lua'
 #arg='lua config setboot vars_noCH.lua ap_init.lua ap_config.lua'
@@ -111,66 +113,88 @@ END
 # end of comment for AP 5.0
 
 
-# AP 5.0 ALT
-: <<'END'
-listMac=(
-        "fe80::213:50ff:fe60:05c1" #uut1 #upgraded to 4.0.1
-        #"fe80::213:50ff:fe60:05ab" #uut2 removed from chamber
-        "fe80::213:50ff:fe60:0581" #uut3
-        "fe80::213:50ff:fe60:05ca" #uut4 
-        "fe80::213:50ff:fe60:0598" #uut5 #converted to ethernet AP
-        "fe80::213:50ff:fe60:05d7" #uut6
-        "fe80::213:50ff:fe60:0584" #uut7 
-        "fe80::213:50ff:fe60:059b" #uut8 
-#        "fe80::213:50ff:fe60:0593" #uut9 removed from chamber
-        "fe80::213:50ff:fe60:0583" #uut10
-        "fe80::213:50ff:fe60:0bc6" #uut11 #has 4.0.1
-        "fe80::213:50ff:fe60:0d71" #uut12 #has 4.0.1
-        "fe80::213:50ff:fe60:0bab" #uut13 #has 4.0.1
-        "fe80::213:50ff:fe60:05d8" #uut14
-        "fe80::213:50ff:fe60:05ba" #uut15
-        "fe80::213:50ff:fe60:05b1" #uut16
-        "fe80::213:50ff:fe60:05b6" #uut17
-        "fe80::213:50ff:fe60:05d5" #uut18
-        "fe80::213:50ff:fe60:0597" #uut19
-        "fe80::213:50ff:fe60:05c5" #uut20
-        "fe80::213:50ff:fe60:05dd" #uut21
-        "fe80::213:50ff:fe60:0586" #uut22
-        "fe80::213:50ff:fe60:05d6" #uut23
-        "fe80::213:50ff:fe60:05ac" #uut24
-	  )
-END
+#: <<'END'
+declare -A listMacs
+listMacs["UUT1"]="fe80::213:5008:0002:7E1E" 
+listMacs["UUT2"]="fe80::213:5008:0002:7E23" 
+listMacs["UUT3"]="fe80::213:5008:0002:7E2A" 
+listMacs["UUT4"]="fe80::213:5008:0002:7E30" 
+listMacs["UUT5"]="fe80::213:5008:0002:7E2F" 
+listMacs["UUT6"]="fe80::213:5008:0002:7E22" 
+listMacs["UUT7"]="fe80::213:5008:0002:7E28" 
+listMacs["UUT8"]="fe80::213:5008:0002:7E1F" 
+listMacs["UUT9"]="fe80::213:5008:0002:7E2E" 
+listMacs["UUT10"]="fe80::213:5008:0002:7E2D"
+listMacs["UUT11"]="fe80::213:5008:0002:7E25"
+listMacs["UUT12"]="fe80::213:5008:0002:7E1C"
+listMacs["UUT13"]="fe80::213:5008:0002:7E48"
+listMacs["UUT14"]="fe80::213:5008:0002:7E3B"
+listMacs["UUT15"]="fe80::213:5008:0002:7E35"
+listMacs["UUT16"]="fe80::213:5008:0002:7E42"
+listMacs["UUT17"]="fe80::213:5008:0002:7E49"
+listMacs["UUT18"]="fe80::213:5008:0002:7E3F"
+listMacs["UUT19"]="fe80::213:5008:0002:7E45"
+listMacs["UUT20"]="fe80::213:5008:0002:7E41"
+listMacs["UUT21"]="fe80::213:5008:0002:7E46"
+listMacs["UUT22"]="fe80::213:5008:0002:7E3A"
+listMacs["UUT23"]="fe80::213:5008:0002:7E3D"
+listMacs["UUT24"]="fe80::213:5008:0002:7E40"
+#END
 
 #: <<'END'
-listIpv4=(
-	"166.255.223.225" #uut1
-#	"166.161.133.071" #uut2 ethernet
-#	"166.255.223.224" #uut3 ethernet
-#	"166.255.223.218" #uut4 ethernet
-#	"166.255.223.221" #uut5 ethernet
-#	"166.161.133.119" #uut6 ethernet
-#	"166.161.133.114" #uut7 ethernet
-	"166.255.223.231" #uut8
-#	"166.161.133.070" #uut9 removed from chamber 
-#	"166.161.133.113" #uut10 ethernet
-	"166.255.223.227" #uut11
-	"166.255.223.235" #uut12
-	"166.255.223.228" #uut13
-	"166.255.223.219" #uut14
-	"166.255.223.232" #uut15
-	"166.255.223.220" #uut16
-	"166.255.223.234" #uut17
-	"166.255.223.223" #uut18
-	"166.255.223.233" #uut19
-	"166.255.223.229" #uut20
-	"166.255.223.217" #uut21
-#	"166.255.223.230" #uut22 ethernet
-	"166.255.223.222" #uut23
-	"166.255.223.226" #uut24
-#	"None" #uut25 ethernet
-#	"None" #uut26 ethernet
-)
+declare -A listIpv4
+listIpv4["UUT1"]="166.201.205.247"
+listIpv4["UUT2"]="166.201.205.251" 
+listIpv4["UUT3"]="166.201.205.223" 
+listIpv4["UUT4"]="166.201.205.225" 
+listIpv4["UUT5"]="166.201.205.226" 
+listIpv4["UUT6"]="166.201.205.191" 
+listIpv4["UUT7"]="166.201.205.143" 
+listIpv4["UUT8"]="166.201.205.142" 
+listIpv4["UUT9"]="166.201.205.184" 
+listIpv4["UUT10"]="166.201.205.202"
+listIpv4["UUT11"]="166.201.64.176" 
+listIpv4["UUT12"]="166.201.205.244"
+listIpv4["UUT13"]="166.248.206.20" 
+listIpv4["UUT14"]="166.248.206.21" 
+listIpv4["UUT15"]="166.248.206.22" 
+listIpv4["UUT16"]="166.248.206.23" 
+listIpv4["UUT17"]="166.248.206.24" 
+listIpv4["UUT18"]="166.253.23.246" 
+listIpv4["UUT19"]="166.253.23.247" 
+listIpv4["UUT20"]="166.253.23.248" 
+listIpv4["UUT21"]="166.253.23.249" 
+listIpv4["UUT22"]="166.253.44.1"   
+listIpv4["UUT23"]="166.253.44.2"   
+listIpv4["UUT24"]="166.253.44.3"
 #END
+
+
+declare -a orders
+orders+=("UUT1")
+orders+=("UUT2")
+orders+=("UUT3")
+orders+=("UUT4")
+orders+=("UUT5")
+orders+=("UUT6")
+orders+=("UUT7")
+orders+=("UUT8")
+orders+=("UUT9")
+orders+=("UUT10")
+orders+=("UUT11")
+orders+=("UUT12")
+orders+=("UUT13")
+orders+=("UUT14")
+orders+=("UUT15")
+orders+=("UUT16")
+orders+=("UUT17")
+orders+=("UUT18")
+orders+=("UUT19")
+orders+=("UUT20")
+orders+=("UUT21")
+orders+=("UUT22")
+orders+=("UUT23")
+orders+=("UUT24")
 
 
 : <<'END'
@@ -181,15 +205,27 @@ do
 	printf "\n"
 done
 END
+
+
+
 #: <<'END'
-#for item in "${listMac[@]}"
-for item in "${listIpv4[@]}"
+timeout=10
+useEth=1
+for i in "${!orders[@]}"
 do
-	printf "%s\n" % $item
-	#$NETMGR -g -d $item -t 60 $arg | grep $grep
-    $NETMGR -d $item -t 60 $arg | grep $grep
-    #getCore $item
-    #removeCore $item
-	printf "\n"
+    uut=${orders[$i]}
+    if [[ useEth > 0 ]]; then
+        printf "$uut - ${listIpv4["$uut"]} - ${listMacs["$uut"]}\n"
+        $NETMGR -d ${listIpv4["$uut"]} -t $timeout $arg | grep $grep
+        #getCore $item
+        #removeCore $item
+        printf "\n"
+    else
+        printf "$uut - ${listMacs["$uut"]} - ${listIpv4["$uut"]}\n"
+        $NETMGR -g -d ${listMacs["$uut"]} -t $timeout $arg | grep $grep        
+        #getCore $item
+        #removeCore $item
+        printf "\n"
+    fi
 done
 #END
