@@ -57,9 +57,10 @@
 #8/30/2017  add timeout to aping 8secs
 #           add fsu reboot every 3600secs
 #9/05/2017  modify fsu reboot timer to 1800 secs, and sleep 60secs after
+#9/15/2017  add more debug to GetEventLog
 
 
-ver="2017.9.5-12.30"
+ver="2017.9.15-20.30"
 
 GetMeterElState=0
 GetLastGaspLog=0
@@ -662,7 +663,7 @@ uutno=0
         if [[ $t0 > $t1 ]]; then
             
             # decide which array to use:
-            if [[ $debug == 1 ]]; then printf "Event Log Interface: %s \n" $EventLogW; fi
+            if [[ $debug == 1 ]]; then printf "Event Log Interface: %s \nuut%s, %s\n" $EventLogW ${uutAndIps["$item"]} $item; fi
 
             if [[ $EventLogW == *'eth'* ]]; then
                 ipArray=("${listIPv6eth[@]}")
@@ -715,9 +716,9 @@ uutno=0
                     fLS_seqnum=$(tac "$logfile" | grep -m 1 ' seqnum' | awk '{printf $3}' | sed 's|,||g')
                     let fLS_seqnum=$fLS_seqnum+0 #convert none to 0
                     
-                    if [[ $fLS_seq > 0 ]]; then
+                    if (( $fLS_seq > $fLS_seqnum )); then
                         let fLS=$fLS_seq
-                    elif [[ $fLS_seqnum > 0 ]]; then
+                    elif (( $fLS_seqnum > $fLS_seq )); then
                         let fLS=$fLS_seqnum
                     else
                         let fLS=0 # if all of above fails, then set last sequnce to read to 0
@@ -733,16 +734,18 @@ uutno=0
 
 
 
-                    if [[ $cLS > $fLS ]]; then #event log sequence from NIC is > from file
+                    if (( $cLS > $fLS )); then #event log sequence from NIC is > from file
+                        if [[ $debug == 1 ]]; then printf "nic event log $cLS larger than log file $fLS.\n"; fi
                         let rFS=$fLS+1 # set sequence to be read to last sequence from file + 1
                         ReadEL $item $rFS $rLS $useEth $meterEl
 
-                    elif [[ $fLS > $cLS ]]; then # if for some reason, the event log sequence from file is > from NIC, then read from the beginning
+                    elif (( $fLS > $cLS )); then # if for some reason, the event log sequence from file is > from NIC, then read from the beginning
                                                  # usually this means event log in NIC has rolled over.
+                        if [[ $debug == 1 ]]; then printf "event log sequence $fLS larger than NIC $cLS, log rolled over.\n"; fi
                         let rFS=$cFS # set sequence to be read to first sequence from NIC
                         ReadEL $item $rFS $rLS $useEth $meterEl
 
-                    elif [[ $fLS == $cLS ]]; then # if event log sequence from file is == from NIC, then do not do anything
+                    elif (( $fLS == $cLS )); then # if event log sequence from file is == from NIC, then do not do anything
                         continue
                     fi
                 else
