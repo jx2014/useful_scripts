@@ -67,8 +67,8 @@ listIPv6=()
 #arg='lua config confirm' #before running this, run config list to make sure all is good
 ####### for troubleshooting #####
 #arg='conf wan_dialer stats_log_sensitivity 0' #default 2 for uAP
-arg='conf wan_itf list'
-#arg='image corelist'
+#arg='wan_itf list'
+arg='image corelist'
 #arg='conf battery calib_low_volt'
 
 
@@ -89,6 +89,7 @@ getCore () {
 removeCore () {
 
     local inputMac=$1
+    local inputIpv4=$2
     local core='some core'
     core=$($NETMGR -g -d $inputMac image corelist | grep 'Image #0' | awk {'printf $3'})
     #$NETMGR -g -d $inputMac image coreload $core
@@ -217,20 +218,22 @@ END
 
 #: <<'END'
 timeout=10
-useEth=0
+useEth=1
+loadCore=0
+removeCore=0
 for i in "${!orders[@]}"
 do
     uut=${orders[$i]}
-    if [[ $useEth > 0 ]]; then
+    if [[ $useEth > 0 ]]; then #use ethernet
         printf "$uut - ${listIpv4["$uut"]} - ${listMacs["$uut"]}\n"
         $NETMGR -d ${listIpv4["$uut"]} -t $timeout $arg | grep $grep
-        #getCore ${listIpv4["$uut"]} 
-        #removeCore ${listIpv4["$uut"]} 
+        #getCore ${listIpv4["$uut"]} $useEth
+        removeCore ${listIpv4["$uut"]} $useEth
         printf "\n"
     else
         printf "$uut - ${listMacs["$uut"]} - ${listIpv4["$uut"]}\n"
         $NETMGR -g -d ${listMacs["$uut"]} -t $timeout $arg | grep $grep        
-        #getCore ${listIpv4["$uut"]} 
+        #getCore ${listMacs["$uut"]} $useEth
         #removeCore ${listMacs["$uut"]}
         printf "\n"
     fi
