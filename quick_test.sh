@@ -83,10 +83,11 @@ getCore () {
     local core='some core'
     if (( $useEth > 0 )); then
         core=$($NETMGR -d $inputMac image corelist | grep 'Image #0' | awk {'printf $3'})
+        $NETMGR -d $inputMac image coreload $core
     else
         core=$($NETMGR -g -d $inputMac image corelist | grep 'Image #0' | awk {'printf $3'})
+        $NETMGR -g -d $inputMac image coreload $core
     fi
-    $NETMGR -g -d $inputMac image coreload $core
     #besure you have downloaded all core before removing it.
     #$NETMGR -g -d $inputMac image coreremove $core
 }
@@ -97,13 +98,15 @@ removeCore () {
     local useEth=$2
     local core='some core'
     if (( $useEth > 0 )); then 
-	core=$($NETMGR -d $inputMac image corelist | grep 'Image #0' | awk {'printf $3'})
+	    core=$($NETMGR -d $inputMac image corelist | grep 'Image #0' | awk {'printf $3'})
+        $NETMGR -d $inputMac image coreremove $core
     else	
-	core=$($NETMGR -g -d $inputMac image corelist | grep 'Image #0' | awk {'printf $3'})
+	    core=$($NETMGR -g -d $inputMac image corelist | grep 'Image #0' | awk {'printf $3'})
+        $NETMGR -g -d $inputMac image coreremove $core
     fi
     #$NETMGR -g -d $inputMac image coreload $core
     #besure you have downloaded all core before removing it.
-    $NETMGR -g -d $inputMac image coreremove $core
+    
 }
 
 
