@@ -79,8 +79,13 @@ declare listIPv6
 getCore () {
 
     local inputMac=$1
+    local useEth=$2
     local core='some core'
-    core=$($NETMGR -g -d $inputMac image corelist | grep 'Image #0' | awk {'printf $3'})
+    if (( $useEth > 0 )); then
+        core=$($NETMGR -d $inputMac image corelist | grep 'Image #0' | awk {'printf $3'})
+    else
+        core=$($NETMGR -g -d $inputMac image corelist | grep 'Image #0' | awk {'printf $3'})
+    fi
     $NETMGR -g -d $inputMac image coreload $core
     #besure you have downloaded all core before removing it.
     #$NETMGR -g -d $inputMac image coreremove $core
@@ -89,9 +94,13 @@ getCore () {
 removeCore () {
 
     local inputMac=$1
-    local inputIpv4=$2
+    local useEth=$2
     local core='some core'
-    core=$($NETMGR -g -d $inputMac image corelist | grep 'Image #0' | awk {'printf $3'})
+    if (( $useEth > 0 )); then 
+	core=$($NETMGR -d $inputMac image corelist | grep 'Image #0' | awk {'printf $3'})
+    else	
+	core=$($NETMGR -g -d $inputMac image corelist | grep 'Image #0' | awk {'printf $3'})
+    fi
     #$NETMGR -g -d $inputMac image coreload $core
     #besure you have downloaded all core before removing it.
     $NETMGR -g -d $inputMac image coreremove $core
