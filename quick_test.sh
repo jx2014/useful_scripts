@@ -5,16 +5,17 @@ listIPv6=()
 #arg='iso_gpio show' 
 #grep='Input state:'
 #arg='nodeq 0'
-#arg='image setboot 4.2.6001 4.2.6001 force'
+#arg='image setboot 4.92.6002 4.92.6002 force'
 #arg='image list'
 #arg='image remove 84.2.6000'
+#arg='image remove 4.2.6001'
 #arg='image upload firmware'
 #arg='get_version_str'
 #arg='conf mlme mlme_mac_net_id' #netID
 #arg='conf phy phy_start_word' #startword
 #arg='sysvar 211' #meter NIC device type, not for ap relay
 #arg='conf meter_dt type'
-arg='conf mlme mlme_reboot_cntr'
+#arg='conf mlme mlme_reboot_cntr'
 #arg='restart now'
 #arg='conf phy phy_tx_pwr'
 #arg='conf phy phy_pwr_out_900'
@@ -40,6 +41,9 @@ arg='conf mlme mlme_reboot_cntr'
 #arg='sysvar ascii:51'
 #arg='sysvar delete:775'
 #arg='trnet show log'
+#arg='trnet loglevel'
+#arg='trnet loglevel 3'
+#arg='trnet loglevel 5 0'
 ####### Bridge Serial Port Setup#######
 #arg='uart_conf read'
 #arg='uart_conf setmode parity:no ws:8 stopbits:1 uartnum:1'
@@ -54,13 +58,16 @@ arg='conf mlme mlme_reboot_cntr'
 #arg='conf mac mac_pv_rssi'
 ####### lua script #######
 #arg='lua config list'
-#arg='lua config upload_init vars_file_vrz6.lua /home/ssnuser/work/project/ALT-uAP-Gen5-Pre/lua/verizon/vars_file_vrz6.lua'
+#arg='lua config upload_init vars_file_vrz7.lua /home/ssnuser/work/project/ALT-uAP-Gen5/lua/verizon/vars_file_vrz7.lua'
 #arg='lua config upload_init vars_noCH.lua ./vars_noCH_from_MichaelLee.lua'
 #arg='lua config verify vars_noCH.lua'
-#arg='lua config setboot vars_noCH.lua ap_init.lua ap_config.lua'
+#arg='lua config verify vars_file_vrz7.lua'
+#arg='lua config setboot vars_file_vrz7.lua ap_init.lua ap_config.lua'
 #arg='lua config setboot'
 #arg='lua config confirm' #before running this, run config list to make sure all is good
 ####### for troubleshooting #####
+#arg='conf wan_dialer stats_log_sensitivity 0' #default 2 for uAP
+arg='conf wan_itf list'
 #arg='image corelist'
 #arg='conf battery calib_low_volt'
 
@@ -171,30 +178,30 @@ listIpv4["UUT24"]="166.253.44.3"
 
 
 declare -a orders
-orders+=("UUT1")
-orders+=("UUT2")
-orders+=("UUT3")
-orders+=("UUT4")
-orders+=("UUT5")
-orders+=("UUT6")
-orders+=("UUT7")
-orders+=("UUT8")
-orders+=("UUT9")
-orders+=("UUT10")
-orders+=("UUT11")
-orders+=("UUT12")
-orders+=("UUT13")
-orders+=("UUT14")
-orders+=("UUT15")
-orders+=("UUT16")
-orders+=("UUT17")
-orders+=("UUT18")
-orders+=("UUT19")
-orders+=("UUT20")
-orders+=("UUT21")
-orders+=("UUT22")
-orders+=("UUT23")
-orders+=("UUT24")
+orders+=("UUT1") #has 4.92.6002 # change to use serial instead of usb
+#orders+=("UUT2") #has 4.92.6002 #changed to use serial instead of usb 
+#orders+=("UUT3") #jx swap spansion
+#orders+=("UUT4") #modem tp
+orders+=("UUT5") #has 4.92.6002 # change to use serial instead of usb
+#orders+=("UUT6") #js debug and swap spansion
+#orders+=("UUT7") #x-section
+#orders+=("UUT8") #has 4.92.6002 #changed to use serial instead of usb 
+#orders+=("UUT9") #has 4.92.6002 #changed to use serial instead of usb 
+orders+=("UUT10") #has 4.92.6002 # change to use serial instead of usb
+#orders+=("UUT11") #x-section
+#orders+=("UUT12") #modem TP probing at ssn
+#orders+=("UUT13") #modem TP probing at ssn
+orders+=("UUT14") #has 4.92.6002 # change to use serial instead of usb
+#orders+=("UUT15") #has 4.92.6002 remove from chamber/KimS
+orders+=("UUT16") #has 4.92.6002 # change to use serial instead of usb
+#orders+=("UUT17") #has 4.92.6002 remove from chamber/KimS
+orders+=("UUT18") #has 4.92.6002 # change to use serial instead of usb
+#orders+=("UUT19") #modem TP probing at ssn
+#orders+=("UUT20") #x-section
+#orders+=("UUT21") #jx swap spansion
+#orders+=("UUT22") #js debug
+#orders+=("UUT23") #has 4.92.6002 #changed to use serial instead of usb 
+orders+=("UUT24") #has 4.92.6002# change to use serial instead of usb
 
 
 : <<'END'
@@ -210,21 +217,21 @@ END
 
 #: <<'END'
 timeout=10
-useEth=1
+useEth=0
 for i in "${!orders[@]}"
 do
     uut=${orders[$i]}
-    if [[ useEth > 0 ]]; then
+    if [[ $useEth > 0 ]]; then
         printf "$uut - ${listIpv4["$uut"]} - ${listMacs["$uut"]}\n"
         $NETMGR -d ${listIpv4["$uut"]} -t $timeout $arg | grep $grep
-        #getCore $item
-        #removeCore $item
+        #getCore ${listIpv4["$uut"]} 
+        #removeCore ${listIpv4["$uut"]} 
         printf "\n"
     else
         printf "$uut - ${listMacs["$uut"]} - ${listIpv4["$uut"]}\n"
         $NETMGR -g -d ${listMacs["$uut"]} -t $timeout $arg | grep $grep        
-        #getCore $item
-        #removeCore $item
+        #getCore ${listIpv4["$uut"]} 
+        #removeCore ${listMacs["$uut"]}
         printf "\n"
     fi
 done
