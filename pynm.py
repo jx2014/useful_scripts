@@ -30,7 +30,12 @@ class Test(object):
         self.timeout = str(timeout)
         subprocess.call([self.NETMGR, "-V"])
         self.eth = self.GetEth()
-        
+   
+    def CheckFSU(self):
+        args = [self.NETMGR, '-i', 'nodeq', '0']
+        p = subprocess.Popen(args, stdout=PIPE, stderr=STDOUT)
+        output = p.stdout.read()
+        return output
 
     def GetEth(self):
         ifconfig_output = subprocess.check_output(['ifconfig'])
