@@ -58,9 +58,10 @@
 #           add fsu reboot every 3600secs
 #9/05/2017  modify fsu reboot timer to 1800 secs, and sleep 60secs after
 #9/15/2017  add more debug to GetEventLog
+#10/11/2017 modify aping - add uut# and increase packetsize to 1024 and increase timer to 10sec
 
 
-ver="2017.9.15-20.30"
+ver="2017.10.11-19.30"
 
 GetMeterElState=0
 GetLastGaspLog=0
@@ -1107,7 +1108,7 @@ uutno=0
         printf "\n...AP Modem ping 8.8.8.8.................\n"
         for item in "${listIPv6[@]}"
         do
-                printf "%s\n" $item
+                printf "%s - %s\n" uut${uutAndIps["$item"]} $item
 
 	
 	        datetime=$(date +%Y-%m-%d,%H:%M:%S)	
@@ -1115,8 +1116,8 @@ uutno=0
             pingcommand='ping'
 
             # sending ping
-	        SendPing=$($NETMGR -g -d $item $NullMode -t 8 $pingcommand start 8.8.8.8 10 100 256)
-            sleep 1
+	        SendPing=$($NETMGR -g -d $item $NullMode -t 8 $pingcommand start 8.8.8.8 10 1000 1024)
+            sleep 10
             #echo 'SendPing ... '$SendPing
 
             # get ping result
