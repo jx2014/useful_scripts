@@ -1108,7 +1108,7 @@ uutno=0
         printf "\n...AP Modem ping 8.8.8.8.................\n"
         for item in "${listIPv6[@]}"
         do
-                printf "%s - %s\n" uut${uutAndIps["$item"]} $item
+                printf "%s - %s\n" $item uut${uutAndIps["$item"]}
 
 	
 	        datetime=$(date +%Y-%m-%d,%H:%M:%S)	
