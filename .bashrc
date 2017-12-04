@@ -1,4 +1,5 @@
 export HISTCONTROL=ignoredups:erasedups
+HISTTIMEFORMAT="%m/%d/%y %T "
 #export PROMPT_COMMAND="history -a; history -c; history -r; ${PROMPT_COMMAND}"
 alias ls="ls -lrt --color"
 PS1='${PWD#"${PWD%/*/*}/"} \$ '

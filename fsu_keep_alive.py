@@ -24,15 +24,19 @@ def CheckFSUonline():
     if 'refused' in fsu_msg:
         return False
     else:
-        print 'FSU online',
         return True
 
 if __name__ == '__main__':
+    msgs = True
     while True:
         if CheckFSUonline():
+            if msgs == True:
+                print 'fsu online',
+                msgs = False
             print '.',
         else:
             print '%s fsu offline, reconnecting..' % time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+            msgs = True
             ConnectFSU()
         time.sleep(60)
 
