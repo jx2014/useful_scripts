@@ -5,17 +5,17 @@ listIPv6=()
 #arg='iso_gpio show' 
 #grep='Input state:'
 #arg='nodeq 0'
-#arg='image setboot 4.92.6002 4.92.6002 force'
-#arg='image list'
+#arg='image setboot 4.92.6006, 4.92.6006 force'
+arg='image list'
 #arg='image remove 84.2.6000'
-#arg='image remove 4.2.6001'
+#arg='image remove 4.92.6005'
 #arg='image upload firmware'
 #arg='get_version_str'
 #arg='conf mlme mlme_mac_net_id' #netID
 #arg='conf phy phy_start_word' #startword
 #arg='sysvar 211' #meter NIC device type, not for ap relay
 #arg='conf meter_dt type'
-#arg='conf mlme mlme_reboot_cntr'
+arg='conf mlme mlme_reboot_cntr'
 #arg='restart now'
 #arg='conf phy phy_tx_pwr'
 #arg='conf phy phy_pwr_out_900'
@@ -57,19 +57,24 @@ listIPv6=()
 #-70 is enabled, change to -50 is disabled
 #arg='conf mac mac_pv_rssi'
 ####### lua script #######
+#arg='lua config confirm' #before running this, run config list to make sure all is good
 #arg='lua config list'
-#arg='lua config upload_init vars_file_vrz7.lua /home/ssnuser/work/project/ALT-uAP-Gen5/lua/verizon/vars_file_vrz7.lua'
-#arg='lua config upload_init vars_noCH.lua ./vars_noCH_from_MichaelLee.lua'
+#arg='lua config upload_init alt-vars-att-LTE4.lua'
+#arg='lua config upload_init alt-vars-vrz-LTE6.lua'
 #arg='lua config verify vars_noCH.lua'
 #arg='lua config verify vars_file_vrz7.lua'
-#arg='lua config setboot vars_file_vrz7.lua ap_init.lua ap_config.lua'
-#arg='lua config setboot'
-#arg='lua config confirm' #before running this, run config list to make sure all is good
+#arg='lua config setboot alt-vars-att-LTE4.lua ap_init.lua mutt_config ap_config.lua'
+#arg='lua config setboot alt-vars-vrz-LTE6.lua ap_init.lua mutt_config ap_config.lua'
+#arg='restart now'
 ####### for troubleshooting #####
-#arg='conf wan_dialer stats_log_sensitivity 0' #default 2 for uAP
+#arg='conf wan_dialer stats_log_sensitivity 2' #default 2 for uAP
 #arg='wan_itf list'
-arg='image corelist'
+#arg='image corelist'
 #arg='conf battery calib_low_volt'
+#arg='trnet loglevel 5 0'
+####### get ipv4 #######
+#arg='trnet show log'
+#arg='restart now'
 
 
 grep='\s'
@@ -97,7 +102,7 @@ removeCore () {
     local inputMac=$1
     local useEth=$2
     local core='some core'
-    if (( $useEth > 0 )); then 
+    if [[ $useEth > 0 ]]; then 
 	    core=$($NETMGR -d $inputMac image corelist | grep 'Image #0' | awk {'printf $3'})
         $NETMGR -d $inputMac image coreremove $core
     else	
@@ -135,86 +140,86 @@ END
 
 #: <<'END'
 declare -A listMacs
-listMacs["UUT1"]="fe80::213:5008:0002:7E1E" 
-listMacs["UUT2"]="fe80::213:5008:0002:7E23" 
-listMacs["UUT3"]="fe80::213:5008:0002:7E2A" 
-listMacs["UUT4"]="fe80::213:5008:0002:7E30" 
-listMacs["UUT5"]="fe80::213:5008:0002:7E2F" 
-listMacs["UUT6"]="fe80::213:5008:0002:7E22" 
-listMacs["UUT7"]="fe80::213:5008:0002:7E28" 
-listMacs["UUT8"]="fe80::213:5008:0002:7E1F" 
-listMacs["UUT9"]="fe80::213:5008:0002:7E2E" 
-listMacs["UUT10"]="fe80::213:5008:0002:7E2D"
-listMacs["UUT11"]="fe80::213:5008:0002:7E25"
-listMacs["UUT12"]="fe80::213:5008:0002:7E1C"
-listMacs["UUT13"]="fe80::213:5008:0002:7E48"
-listMacs["UUT14"]="fe80::213:5008:0002:7E3B"
-listMacs["UUT15"]="fe80::213:5008:0002:7E35"
-listMacs["UUT16"]="fe80::213:5008:0002:7E42"
-listMacs["UUT17"]="fe80::213:5008:0002:7E49"
-listMacs["UUT18"]="fe80::213:5008:0002:7E3F"
-listMacs["UUT19"]="fe80::213:5008:0002:7E45"
-listMacs["UUT20"]="fe80::213:5008:0002:7E41"
-listMacs["UUT21"]="fe80::213:5008:0002:7E46"
-listMacs["UUT22"]="fe80::213:5008:0002:7E3A"
-listMacs["UUT23"]="fe80::213:5008:0002:7E3D"
-listMacs["UUT24"]="fe80::213:5008:0002:7E40"
+listMacs["UUT1"]="fe80::213:5008:0002:B0CC" 
+listMacs["UUT2"]="fe80::213:5008:0002:B0ED" 
+listMacs["UUT3"]="fe80::213:5008:0002:B0FA" 
+listMacs["UUT4"]="fe80::213:5008:0002:B106" 
+listMacs["UUT5"]="fe80::213:5008:0002:B0BE" 
+listMacs["UUT6"]="fe80::213:5008:0002:B0FB" 
+listMacs["UUT7"]="fe80::213:5008:0002:B0C5" 
+listMacs["UUT8"]="fe80::213:5008:0002:B0F9" 
+listMacs["UUT9"]="fe80::213:5008:0002:E0E5" 
+listMacs["UUT10"]="fe80::213:5008:0002:E0CC"
+listMacs["UUT11"]="fe80::213:5008:0002:E0CF"
+listMacs["UUT12"]="fe80::213:5008:0002:E0F7"
+listMacs["UUT13"]="fe80::213:5008:0002:E0E6"
+listMacs["UUT14"]="fe80::213:5008:0002:E0D1"
+listMacs["UUT15"]="fe80::213:5008:0002:E0DC"
+listMacs["UUT16"]="fe80::213:5008:0002:7E45"
+listMacs["UUT17"]="fe80::213:5008:0002:E0DD"
+listMacs["UUT18"]="fe80::213:5008:0002:E0C9"
+listMacs["UUT19"]="fe80::213:5008:0002:E0D3"
+listMacs["UUT20"]="fe80::213:5008:0002:E0F5"
+listMacs["UUT21"]="fe80::213:5008:0002:B102"
+listMacs["UUT22"]="fe80::213:5008:0002:B0F2"
+listMacs["UUT23"]="fe80::213:5008:0002:B0C6"
+listMacs["UUT24"]="fe80::213:5008:0002:B0C7"
 #END
 
 #: <<'END'
 declare -A listIpv4
-listIpv4["UUT1"]="166.201.205.247"
-listIpv4["UUT2"]="166.201.205.251" 
-listIpv4["UUT3"]="166.201.205.223" 
-listIpv4["UUT4"]="166.201.205.225" 
-listIpv4["UUT5"]="166.201.205.226" 
-listIpv4["UUT6"]="166.201.205.191" 
-listIpv4["UUT7"]="166.201.205.143" 
-listIpv4["UUT8"]="166.201.205.142" 
-listIpv4["UUT9"]="166.201.205.184" 
-listIpv4["UUT10"]="166.201.205.202"
-listIpv4["UUT11"]="166.201.64.176" 
-listIpv4["UUT12"]="166.201.205.244"
-listIpv4["UUT13"]="166.248.206.20" 
-listIpv4["UUT14"]="166.248.206.21" 
-listIpv4["UUT15"]="166.248.206.22" 
-listIpv4["UUT16"]="166.248.206.23" 
-listIpv4["UUT17"]="166.248.206.24" 
-listIpv4["UUT18"]="166.253.23.246" 
-listIpv4["UUT19"]="166.253.23.247" 
-listIpv4["UUT20"]="166.253.23.248" 
-listIpv4["UUT21"]="166.253.23.249" 
-listIpv4["UUT22"]="166.253.44.1"   
-listIpv4["UUT23"]="166.253.44.2"   
-listIpv4["UUT24"]="166.253.44.3"
+listIpv4["UUT1"]="166.201.205.178"
+listIpv4["UUT2"]="166.201.205.197" 
+listIpv4["UUT3"]="166.201.205.172" 
+listIpv4["UUT4"]="166.201.205.208" 
+listIpv4["UUT5"]="166.201.205.192" 
+listIpv4["UUT6"]="166.201.205.243" 
+listIpv4["UUT7"]="166.201.205.195"
+listIpv4["UUT8"]="166.201.205.153"
+listIpv4["UUT9"]="166.253.44.166" #verizon
+listIpv4["UUT10"]="166.253.44.120" #verizon
+listIpv4["UUT11"]="166.253.44.115" #verizon
+listIpv4["UUT12"]="166.253.44.6" #verizon
+listIpv4["UUT13"]="166.253.44.117" #verizon
+listIpv4["UUT14"]="166.253.44.4"  #verizon
+listIpv4["UUT15"]="166.253.44.118" #verizon 
+listIpv4["UUT16"]="166.253.44.8" #verizon
+listIpv4["UUT17"]="166.253.44.121" #verizon
+listIpv4["UUT18"]="166.253.44.7" #verizon
+listIpv4["UUT19"]="166.253.44.119" #verizon
+listIpv4["UUT20"]="166.253.44.5" #verizon
+listIpv4["UUT21"]="166.201.205.203"
+listIpv4["UUT22"]="166.201.205.135"
+listIpv4["UUT23"]="166.201.205.221"
+listIpv4["UUT24"]="166.201.205.194"
 #END
 
 
 declare -a orders
-orders+=("UUT1") #has 4.92.6002 # change to use serial instead of usb
-#orders+=("UUT2") #has 4.92.6002 #changed to use serial instead of usb 
-#orders+=("UUT3") #jx swap spansion
-#orders+=("UUT4") #modem tp
-orders+=("UUT5") #has 4.92.6002 # change to use serial instead of usb
-#orders+=("UUT6") #js debug and swap spansion
-#orders+=("UUT7") #x-section
-#orders+=("UUT8") #has 4.92.6002 #changed to use serial instead of usb 
-#orders+=("UUT9") #has 4.92.6002 #changed to use serial instead of usb 
-orders+=("UUT10") #has 4.92.6002 # change to use serial instead of usb
-#orders+=("UUT11") #x-section
-#orders+=("UUT12") #modem TP probing at ssn
-#orders+=("UUT13") #modem TP probing at ssn
-orders+=("UUT14") #has 4.92.6002 # change to use serial instead of usb
-#orders+=("UUT15") #has 4.92.6002 remove from chamber/KimS
-orders+=("UUT16") #has 4.92.6002 # change to use serial instead of usb
-#orders+=("UUT17") #has 4.92.6002 remove from chamber/KimS
-orders+=("UUT18") #has 4.92.6002 # change to use serial instead of usb
-#orders+=("UUT19") #modem TP probing at ssn
-#orders+=("UUT20") #x-section
-#orders+=("UUT21") #jx swap spansion
-#orders+=("UUT22") #js debug
-#orders+=("UUT23") #has 4.92.6002 #changed to use serial instead of usb 
-orders+=("UUT24") #has 4.92.6002# change to use serial instead of usb
+#orders+=("UUT1") 
+#orders+=("UUT2") 
+orders+=("UUT3") 
+orders+=("UUT4") 
+orders+=("UUT5") 
+#orders+=("UUT6") 
+orders+=("UUT7") 
+orders+=("UUT8") 
+orders+=("UUT9")  #verizon
+orders+=("UUT10") #verizon 
+orders+=("UUT11") #verizon 
+orders+=("UUT12") #verizon 
+orders+=("UUT13") #verizon 
+orders+=("UUT14") #verizon 
+orders+=("UUT15") #verizon 
+orders+=("UUT16") #verizon 
+orders+=("UUT17") #verizon 
+orders+=("UUT18") #verizon 
+orders+=("UUT19") #verizon 
+orders+=("UUT20") #verizon
+orders+=("UUT21") 
+orders+=("UUT22") 
+orders+=("UUT23") 
+orders+=("UUT24") 
 
 
 : <<'END'
@@ -229,8 +234,8 @@ END
 
 
 #: <<'END'
-timeout=10
-useEth=1
+timeout=30
+useEth=0
 loadCore=0
 removeCore=0
 for i in "${!orders[@]}"
@@ -240,13 +245,17 @@ do
         printf "$uut - ${listIpv4["$uut"]} - ${listMacs["$uut"]}\n"
         $NETMGR -d ${listIpv4["$uut"]} -t $timeout $arg | grep $grep
         #getCore ${listIpv4["$uut"]} $useEth
-        removeCore ${listIpv4["$uut"]} $useEth
+        if [[ $removeCore > 0 ]]; then
+            removeCore ${listIpv4["$uut"]} $useEth
+        fi
         printf "\n"
     else
         printf "$uut - ${listMacs["$uut"]} - ${listIpv4["$uut"]}\n"
         $NETMGR -g -d ${listMacs["$uut"]} -t $timeout $arg | grep $grep        
         #getCore ${listMacs["$uut"]} $useEth
-        #removeCore ${listMacs["$uut"]}
+        if [[ $removeCore > 0 ]]; then        
+            removeCore ${listMacs["$uut"]}
+        fi
         printf "\n"
     fi
 done
