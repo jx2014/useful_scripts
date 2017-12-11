@@ -235,16 +235,18 @@ END
 
 #: <<'END'
 timeout=30
-useEth=0
-loadCore=0
-removeCore=0
+useEth=1
+loadCore=1
+removeCore=1
 for i in "${!orders[@]}"
 do
     uut=${orders[$i]}
     if [[ $useEth > 0 ]]; then #use ethernet
         printf "$uut - ${listIpv4["$uut"]} - ${listMacs["$uut"]}\n"
         $NETMGR -d ${listIpv4["$uut"]} -t $timeout $arg | grep $grep
-        #getCore ${listIpv4["$uut"]} $useEth
+        if [[ $loadCore > 0 ]]; then
+            getCore ${listIpv4["$uut"]} $useEth
+        fi
         if [[ $removeCore > 0 ]]; then
             removeCore ${listIpv4["$uut"]} $useEth
         fi
@@ -252,7 +254,9 @@ do
     else
         printf "$uut - ${listMacs["$uut"]} - ${listIpv4["$uut"]}\n"
         $NETMGR -g -d ${listMacs["$uut"]} -t $timeout $arg | grep $grep        
-        #getCore ${listMacs["$uut"]} $useEth
+        if [[ $loadCore > 0 ]]; then        
+            getCore ${listMacs["$uut"]}
+        fi
         if [[ $removeCore > 0 ]]; then        
             removeCore ${listMacs["$uut"]}
         fi
