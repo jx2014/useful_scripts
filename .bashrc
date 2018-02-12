@@ -36,9 +36,10 @@ meterELstate() {
 alias readel=meterELstate
 
 neighdisc() {
-  macid=$1
+  #macid=$1
+  macid=$(echo $1 | tr '[:upper:]' '[:lower:]')
   fsu mlme_disc_mac $macid
-  fsu nodeq 0 | grep ${macid: -2}
+  fsu nodeq 0 | grep :${macid: -2}
 }
 
 alias neighbor_disc=neighdisc
