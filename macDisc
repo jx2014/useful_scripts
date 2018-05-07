@@ -59,9 +59,11 @@
 #9/05/2017  modify fsu reboot timer to 1800 secs, and sleep 60secs after
 #9/15/2017  add more debug to GetEventLog
 #10/11/2017 modify aping - add uut# and increase packetsize to 1024 and increase timer to 10sec
+#4/20/2018  add apping variable address
+#           add trnet show log
 
 
-ver="2017.10.11-19.30"
+ver="2018.4.20-13.00"
 
 GetMeterElState=0
 GetLastGaspLog=0
@@ -83,6 +85,7 @@ GetRSSI=0
 SleepTimer=60
 ClearRssi=0
 GetAPing=0
+PingAddr="8.8.8.8"
 GetCRC=0
 GetSig=0
 GetBatteryStatus=0
@@ -93,6 +96,7 @@ debug=0
 useGwncc="-g"
 GetRfPing=0
 GetFSUReboot=0
+GetTrnetLog=0
 
 
 
@@ -106,7 +110,7 @@ RssiFirstRun=0
 
 
 
-while getopts "l:e:Lg:GI:S:ErRcPCht:sbvp:NDF" opt; do
+while getopts "l:e:Lg:GI:S:ErRcP:Cht:sbvp:NDFT" opt; do
 	case "$opt" in
 	l) LastGaspLogW=${OPTARG}
 	    GetLastGaspLog=1
@@ -136,8 +140,9 @@ while getopts "l:e:Lg:GI:S:ErRcPCht:sbvp:NDF" opt; do
 	c) ClearRssi=1
 	   echo "- Clear Rssi"
 	   ;;
-    P) GetAPing=1       
-       echo "- Test AP Ping"
+    P) PingAddr=${OPTARG}
+       GetAPing=1       
+       echo "- Test AP Ping" $OPTARG
        ;;
     C) GetCRC=1
        echo "- Test FW CRC"
@@ -174,6 +179,9 @@ while getopts "l:e:Lg:GI:S:ErRcPCht:sbvp:NDF" opt; do
     F) GetFSUReboot=1
        echo "- FSU reboots every 1 hour"
        ;;
+    T) GetTrnetLog=1
+       echo "- Get Trnet Show log"
+       ;;
     h)
        printf "Avaliable options:
  -l Get Last Gasp Log, use '-l ethx' to use ethernet interface.
@@ -196,6 +204,7 @@ while getopts "l:e:Lg:GI:S:ErRcPCht:sbvp:NDF" opt; do
  -G Not to use Gwncc (useful when FSU is not plugged in)
  -R get RF_Ping
  -F FSU reboots every 1 hour
+ -T GetTrnetLog
  -D debug mode
 
 Examples:
@@ -1105,7 +1114,7 @@ uutno=0
 
         # AP modem ping 8.8.8.8 google 5/19/2016
         if [ "$GetAPing" = 1 ]; then
-        printf "\n...AP Modem ping 8.8.8.8.................\n"
+        printf "\n...AP Modem ping $PingAddr.................\n"
         for item in "${listIPv6[@]}"
         do
                 printf "%s - %s\n" $item uut${uutAndIps["$item"]}
@@ -1116,7 +1125,7 @@ uutno=0
             pingcommand='ping'
 
             # sending ping
-	        SendPing=$($NETMGR -g -d $item $NullMode -t 8 $pingcommand start 8.8.8.8 10 1000 1024)
+	        SendPing=$($NETMGR -g -d $item $NullMode -t 8 $pingcommand start $PingAddr 10 1000 1024)
             sleep 10
             #echo 'SendPing ... '$SendPing
 
@@ -1211,6 +1220,22 @@ uutno=0
                 echo $datetime >> "battery_log_uut${uutAndIps["$item"]}_${macAndIps["$item"]}.txt"
 		        echo "$batterystatus" | tee -a "battery_log_uut${uutAndIps["$item"]}_${macAndIps["$item"]}.txt"
                 echo " " | tee -a "battery_log_uut${uutAndIps["$item"]}_${macAndIps["$item"]}.txt" # create line break
+
+	        done
+        fi
+
+        if [ "$GetTrnetLog" = 1 ]; then
+            printf "\n...Get Trnet Show log...................\n"
+	        for item in "${listIPv6[@]}"
+	        do
+		        #printf "%s\n" $item
+
+		        TrnetShowLog=$($NETMGR -g -d $item $NullMode trnet show log 2>&1)
+			
+		        datetime=$(date +%Y-%m-%d,%H:%M:%S)
+                echo $datetime >> "trnetlog_log_uut${uutAndIps["$item"]}_${macAndIps["$item"]}.txt"
+		        echo "$TrnetShowLog" | tee -a "trnetlog_log_uut${uutAndIps["$item"]}_${macAndIps["$item"]}.txt"
+                echo " " | tee -a "trnetlog_log_uut${uutAndIps["$item"]}_${macAndIps["$item"]}.txt" # create line break
 
 	        done
         fi
