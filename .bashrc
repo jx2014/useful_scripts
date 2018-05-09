@@ -12,6 +12,7 @@ alias quick_test=~/work/quick_test.sh
 alias fsu="~/work/net_mgr -i"
 alias fsu_netid="~/work/net_mgr -i conf mlme mlme_mac_net_id"
 alias fsu_startword="~/work/net_mgr -i conf phy phy_start_word"
+alias fsu_prom="~/work/net_mgr -i conf mlme mlme_ignore_prom_net_id"
 alias nic="~/work/net_mgr -g -d"
 alias eth="~/work/net_mgr -d"
 alias test=~/work/test.py
