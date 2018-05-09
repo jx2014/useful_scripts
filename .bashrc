@@ -34,8 +34,6 @@ meterELstate() {
 
 }
 
-alias readel=meterELstate
-
 neighdisc() {
   #macid=$1
   macid=$(echo $1 | tr '[:upper:]' '[:lower:]')
@@ -43,4 +41,25 @@ neighdisc() {
   fsu nodeq 0 | grep :${macid: -2}
 }
 
+nicStartword() {
+  macid=$1  
+  nic $macid conf phy phy_start_word
+}
+
+nicNetID() {
+  macid=$1  
+  nic $macid conf mlme mlme_mac_net_id
+}
+
+nicIgnoreProm() {
+  macid=$1  
+  nic $macid conf mlme mlme_ignore_prom_net_id
+}
+
+
+
 alias neighbor_disc=neighdisc
+alias readel=meterELstate
+alias nic_startword=nicStartword
+alias nic_netid=nicNetID
+alias nic_prom=nicIgnoreProm
