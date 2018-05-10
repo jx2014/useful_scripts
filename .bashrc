@@ -56,6 +56,11 @@ nicIgnoreProm() {
   nic $macid conf mlme mlme_ignore_prom_net_id
 }
 
+nicReboot() {
+  macid=$1  
+  nic $macid conf mlme mlme_reboot_cntr
+}
+
 
 
 alias neighbor_disc=neighdisc
@@ -63,3 +68,5 @@ alias readel=meterELstate
 alias nic_startword=nicStartword
 alias nic_netid=nicNetID
 alias nic_prom=nicIgnoreProm
+alias nic_reboot=nicReboot
+
