@@ -61,7 +61,7 @@
 #10/11/2017 modify aping - add uut# and increase packetsize to 1024 and increase timer to 10sec
 #4/20/2018  add apping variable address
 #           add trnet show log
-
+#5/30/2018  fix typo
 
 ver="2018.4.20-13.00"
 
@@ -183,7 +183,7 @@ while getopts "l:e:Lg:GI:S:ErRcP:Cht:sbvp:NDFT" opt; do
        echo "- Get Trnet Show log"
        ;;
     h)
-       printf "Avaliable options:
+       printf "Available options:
  -l Get Last Gasp Log, use '-l ethx' to use ethernet interface.
  -e Get Event Log, use '-e ethx' to use ethernet interface.
  -L Looping 

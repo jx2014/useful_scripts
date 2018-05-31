@@ -3,10 +3,11 @@ NETMGR=/home/ssnuser/work/net_mgr
 listIPv6=()
 
 #arg='iso_gpio show' 
-#grep='Input state:'
+#greparg='port='
+#greparg='166'
 #arg='nodeq 0'
 #arg='image setboot 4.2.6002, 4.2.6002'
-arg='image list'
+#arg='image list'
 #arg='image remove 84.92.6009'
 #arg='image remove 4.2.6002'
 #arg='image upload fw'
@@ -57,13 +58,13 @@ arg='image list'
 #arg='comm_server_conf uart:1 type:tcp listen_port:2002 peer_port:2002'
 ####### RSSI power varying ######
 #-70 is enabled, change to -50 is disabled
-#arg='conf mac mac_pv_rssi'
+#arg='conf mac mac_pv_rssi -70'
 ####### lua script #######
 #arg='lua config confirm' #before running this, run config list to make sure all is good
 #arg='lua config list'
 #arg='lua config setboot alt-vars-vrz-LTE6.lua ap_init.lua mutt_config ap_config.lua'
-#arg='lua config upload_init alt-vars-att-LTE4.lua'
-#arg='lua config upload_init alt-vars-vrz-LTE6.lua'
+#arg='lua config upload_init alt-vars-att-LTE7.lua'
+#arg='lua config upload_init alt-vars-vrz-LTE9.lua'
 #arg='lua config upload_init ap_init.lua'
 #arg='lua config upload mutt_config'
 #arg='lua config upload ap_config.lua'
@@ -73,7 +74,7 @@ arg='image list'
 #arg='lua config list'
 #arg='restart now'
 ####### for troubleshooting #####
-#arg='conf wan_dialer stats_log_sensitivity 2' #default 2 for uAP
+#arg='conf wan_dialer stats_log_sensitivity' #default 2 for uAP
 #arg='wan_itf list'
 #arg='image corelist'
 #arg='conf battery calib_low_volt'
@@ -195,6 +196,40 @@ listMacs["UUT51"]="fe80::213:5008:0004:77D0"
 listMacs["UUT52"]="fe80::213:5008:0004:7A2F"
 listMacs["UUT53"]="fe80::213:5008:0004:7A0B"
 listMacs["UUT54"]="fe80::213:5008:0004:7760"
+#new uAP 4/4/2018
+listMacs["UUT55"]="fe80::213:5008:0006:2F44"
+listMacs["UUT56"]="fe80::213:5008:0006:2F56"
+listMacs["UUT57"]="fe80::213:5008:0006:2F3E"
+listMacs["UUT58"]="fe80::213:5008:0006:2F43"
+listMacs["UUT59"]="fe80::213:5008:0006:2F38"
+listMacs["UUT60"]="fe80::213:5008:0006:2F3B"
+listMacs["UUT61"]="fe80::213:5008:0006:2F54"
+listMacs["UUT62"]="fe80::213:5008:0006:2F39"
+listMacs["UUT63"]="fe80::213:5008:0006:2F4D"
+listMacs["UUT64"]="fe80::213:5008:0006:2F37"
+listMacs["UUT65"]="fe80::213:5008:0006:2F3F"
+listMacs["UUT66"]="fe80::213:5008:0006:2F3A"
+#listMacs["UUT67"]="fe80::213:5008:0006:2F41"
+#listMacs["UUT68"]="fe80::213:5008:0006:2F42"
+#listMacs["UUT69"]="fe80::213:5008:0006:2F40"
+#listMacs["UUT70"]="fe80::213:5008:0006:2F2F"
+listMacs["UUT71"]="fe80::213:5008:0006:2F6D"
+listMacs["UUT72"]="fe80::213:5008:0006:2F6B"
+listMacs["UUT73"]="fe80::213:5008:0006:2F57"
+listMacs["UUT74"]="fe80::213:5008:0006:2F67"
+listMacs["UUT75"]="fe80::213:5008:0006:2F71"
+listMacs["UUT76"]="fe80::213:5008:0006:2F5E"
+listMacs["UUT77"]="fe80::213:5008:0006:2F72"
+listMacs["UUT78"]="fe80::213:5008:0006:2F6C"
+listMacs["UUT79"]="fe80::213:5008:0006:2F70"
+listMacs["UUT80"]="fe80::213:5008:0006:2F58"
+listMacs["UUT81"]="fe80::213:5008:0006:2F6E"
+listMacs["UUT82"]="fe80::213:5008:0006:2F5A"
+#listMacs["UUT83"]="fe80::213:5008:0006:2F5B"
+#listMacs["UUT84"]="fe80::213:5008:0006:2F59"
+#listMacs["UUT85"]="fe80::213:5008:0006:2F6F"
+#listMacs["UUT86"]="fe80::213:5008:0006:2F5C"
+
 #END
 
 #: <<'END'
@@ -223,31 +258,63 @@ listIpv4["UUT21"]="166.201.205.203"
 listIpv4["UUT22"]="166.201.205.135"
 listIpv4["UUT23"]="166.201.205.221"
 listIpv4["UUT24"]="166.201.205.194"
-#new units
 listIpv4["UUT31"]="166.201.64.204"
 listIpv4["UUT32"]="166.201.64.207"
 listIpv4["UUT33"]="166.201.64.213"
 listIpv4["UUT34"]="166.201.64.198"
 listIpv4["UUT35"]="166.201.64.192"
 listIpv4["UUT36"]="166.201.64.183"
-listIpv4["UUT37"]="166.201.205.145"
+listIpv4["UUT37"]="166.201.205.151"
 listIpv4["UUT38"]="166.201.64.181"
-listIpv4["UUT39"]="166.201.205.149"
-listIpv4["UUT40"]="166.201.64.242"
+#listIpv4["UUT39"]="166.201.205.149" #old sim card went bad on 2/17
+listIpv4["UUT39"]="166.201.205.203"
+#listIpv4["UUT40"]="166.201.64.242" #old sim card went bad on 2/17
+listIpv4["UUT40"]="166.201.205.135"
 listIpv4["UUT41"]="166.201.64.239"
 listIpv4["UUT42"]="166.201.64.160"
 listIpv4["UUT43"]="166.253.44.124" #verizon
 listIpv4["UUT44"]="166.253.44.125" #verizon
 listIpv4["UUT45"]="166.253.44.126" #verizon
-listIpv4["UUT46"]="166.253.44.127" #verizon
-listIpv4["UUT47"]="166.253.44.130" #verizon
-listIpv4["UUT48"]="166.253.44.131" #verizon
+#listIpv4["UUT46"]="166.253.44.127" #verizon # old sim card went bad on 3/6 7:45pm
+listIpv4["UUT46"]="166.253.44.6" #verizon
+#listIpv4["UUT47"]="166.253.44.130" #verizon # old sim card went bad
+listIpv4["UUT47"]="166.253.44.4" #verizon
+#listIpv4["UUT48"]="166.253.44.131" #verizon # old sim card went bad
+listIpv4["UUT48"]="166.253.44.119" #verizon
 listIpv4["UUT49"]="166.253.44.132" #verizon
-listIpv4["UUT50"]="166.253.44.133" #verizon
-listIpv4["UUT51"]="166.253.44.134" #verizon
+#listIpv4["UUT50"]="166.253.44.133" #verizon # old sim card went bad on 
+listIpv4["UUT50"]="166.253.44.120" #verizon
+#listIpv4["UUT51"]="166.253.44.134" #verizon # old sim card went bad
+listIpv4["UUT51"]="166.253.44.118" #verizon
 listIpv4["UUT52"]="166.253.44.135" #verizon
 listIpv4["UUT53"]="166.253.44.136" #verizon
-listIpv4["UUT54"]="166.253.44.137" #verizon
+#listIpv4["UUT54"]="166.253.44.137" #verizon # old sim card went bad on 
+listIpv4["UUT54"]="166.253.44.115" #verizon
+
+listIpv4["UUT55"]="166.201.64.204"
+listIpv4["UUT56"]="166.201.64.207"
+listIpv4["UUT57"]="166.201.64.213"
+listIpv4["UUT58"]="166.201.64.198"
+listIpv4["UUT59"]="166.201.64.192"
+listIpv4["UUT60"]="166.201.64.183"
+listIpv4["UUT61"]="166.201.205.151"
+listIpv4["UUT62"]="166.201.64.181"
+listIpv4["UUT63"]="166.201.205.149"
+listIpv4["UUT64"]="166.201.64.242" 
+listIpv4["UUT65"]="166.201.64.239"
+listIpv4["UUT66"]="166.201.64.160"
+listIpv4["UUT71"]="166.253.44.124" #verizon
+listIpv4["UUT72"]="166.253.44.125" #verizon
+listIpv4["UUT73"]="166.253.44.126" #verizon
+listIpv4["UUT74"]="166.253.44.127" #verizon
+listIpv4["UUT75"]="166.253.44.130" #verizon
+listIpv4["UUT76"]="166.253.44.131" #verizon
+listIpv4["UUT77"]="166.253.44.132" #verizon
+listIpv4["UUT78"]="166.253.44.133" #verizon
+listIpv4["UUT79"]="166.253.44.134" #verizon
+listIpv4["UUT80"]="166.253.44.135" #verizon
+listIpv4["UUT81"]="166.253.44.136" #verizon
+listIpv4["UUT82"]="166.253.44.137" #verizon
 #END
 
 
@@ -277,18 +344,18 @@ declare -a orders
 #orders+=("UUT23") 
 #orders+=("UUT24")
 #new units
-#orders+=("UUT31") 
-#orders+=("UUT32")
-#orders+=("UUT33")
-#orders+=("UUT34")
-#orders+=("UUT35")
-#orders+=("UUT36")
-#orders+=("UUT37") 
-#orders+=("UUT38")
-#orders+=("UUT39")
-#orders+=("UUT40")
-#orders+=("UUT41")
-#orders+=("UUT42")
+orders+=("UUT31") 
+orders+=("UUT32")
+orders+=("UUT33")
+orders+=("UUT34")
+orders+=("UUT35")
+orders+=("UUT36")
+orders+=("UUT37") 
+orders+=("UUT38")
+orders+=("UUT39")
+orders+=("UUT40")
+orders+=("UUT41")
+orders+=("UUT42")
 orders+=("UUT43") #verizon
 orders+=("UUT44") #verizon
 orders+=("UUT45") #verizon
@@ -301,6 +368,30 @@ orders+=("UUT51") #verizon
 orders+=("UUT52") #verizon
 orders+=("UUT53") #verizon
 orders+=("UUT54") #verizon
+#orders+=("UUT55") 
+#orders+=("UUT56")
+#orders+=("UUT57")
+#orders+=("UUT58")
+#orders+=("UUT59")
+#orders+=("UUT60")
+#orders+=("UUT61") 
+#orders+=("UUT62")
+#orders+=("UUT63")
+#orders+=("UUT64")
+#orders+=("UUT65")
+#orders+=("UUT66")
+#orders+=("UUT71") #verizon
+#orders+=("UUT72") #verizon
+#orders+=("UUT73") #verizon
+#orders+=("UUT74") #verizon
+#orders+=("UUT75") #verizon
+#orders+=("UUT76") #verizon
+#orders+=("UUT77") #verizon
+#orders+=("UUT78") #verizon
+#orders+=("UUT79") #verizon
+#orders+=("UUT80") #verizon
+#orders+=("UUT81") #verizon
+#orders+=("UUT82") #verizon
 
 
 : <<'END'
@@ -324,7 +415,7 @@ do
     uut=${orders[$i]}
     if [[ $useEth > 0 ]]; then #use ethernet
         printf "$uut - ${listIpv4["$uut"]} - ${listMacs["$uut"]}\n"
-        $NETMGR -d ${listIpv4["$uut"]} -t $timeout $arg | grep $grep
+        $NETMGR -d ${listIpv4["$uut"]} -t $timeout $arg #| grep $greparg
         if [[ $loadCore > 0 ]]; then
             getCore ${listIpv4["$uut"]} $useEth
         fi
@@ -334,7 +425,7 @@ do
         printf "\n"
     else
         printf "$uut - ${listMacs["$uut"]} - ${listIpv4["$uut"]}\n"
-        $NETMGR -g -d ${listMacs["$uut"]} -t $timeout $arg | grep $grep        
+        $NETMGR -g -d ${listMacs["$uut"]} -t $timeout $arg #| grep $greparg        
         if [[ $loadCore > 0 ]]; then        
             getCore ${listMacs["$uut"]}
         fi
