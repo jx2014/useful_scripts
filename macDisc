@@ -65,7 +65,7 @@
 #6/18/2018  edit version number
 #7/2/2018   add time sync
 
-ver="2018.6.18-19.00"
+ver="2018.7.2-19.00"
 
 GetMeterElState=0
 GetLastGaspLog=0
@@ -537,7 +537,7 @@ uutno=0
 
 			            bootcounter=$(echo $boot_msg | grep -oP '\d*')
 			            devicetype=$($NETMGR -g -d $ipv6 $NullMode sysvar 211 | grep -oP '(?<=DEVTYPE:\s).*')	
-			            devicetype=$(printf "%d" $devicetype)
+			            devicetype=$(printf "%d" $devicetype)            setTimeZone $ipv6
                         setTimeZone $ipv6
 
 			            listIPv6+=("$ipv6")
