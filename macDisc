@@ -65,7 +65,7 @@
 #6/18/2018  edit version number
 #7/2/2018   add time sync
 
-ver="2018.7.2-19.00"
+ver="2018.7.2-13:00"
 
 GetMeterElState=0
 GetLastGaspLog=0
@@ -431,12 +431,12 @@ ReadEL() {
 setTimeZone() {
     local uut=$1
     # read current local time and get the year
-    y=$(nic $uut time local | grep Year | grep -Eo "\d{4}")
-
+    y=$($NETMGR -g -d $uut time local | grep -Eo [0-9]\{4\})
+    # printf "y: $y\n"
     # test if time zone has been set or not:
-    if [ $y <= 2000 ]; then
-        nic $uut time_zone set -f /usr/share/zoneinfo/America/Los_Angeles
-        nic $uut time set_time off
+    if [[ $y < 2000 ]]; then
+        $NETMGR -g -d $uut time_zone set -f /usr/share/zoneinfo/America/Los_Angeles
+        $NETMGR -g -d $uut time set_time off
     fi
 }
 
