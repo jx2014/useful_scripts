@@ -63,6 +63,7 @@
 #           add trnet show log
 #5/30/2018  fix typo
 #6/18/2018  edit version number
+#7/2/2018   add time sync
 
 ver="2018.6.18-19.00"
 
@@ -427,6 +428,18 @@ ReadEL() {
 }
 
 
+setTimeZone() {
+    local uut=$1
+    # read current local time and get the year
+    y=$(nic $uut time local | grep Year | grep -Eo "\d{4}")
+
+    # test if time zone has been set or not:
+    if [ $y <= 2000 ]; then
+        nic $uut time_zone set -f /usr/share/zoneinfo/America/Los_Angeles
+        nic $uut time set_time off
+    fi
+}
+
 #begin of while loop
 while true;do
 
@@ -525,13 +538,13 @@ uutno=0
 			            bootcounter=$(echo $boot_msg | grep -oP '\d*')
 			            devicetype=$($NETMGR -g -d $ipv6 $NullMode sysvar 211 | grep -oP '(?<=DEVTYPE:\s).*')	
 			            devicetype=$(printf "%d" $devicetype)
+                        setTimeZone $ipv6
 
 			            listIPv6+=("$ipv6")
 
 			            printf "uut%s %s found in nodeq," "$uutno" "$macid1"
 			            printf " reboot:%4s," "$bootcounter"
 			            printf " dev_typ:%3s," "$devicetype"
-
 			            printf " ipv6:%s"   "$ipv6"
 
 
