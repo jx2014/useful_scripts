@@ -62,11 +62,16 @@ nicReboot() {
 }
 
 
-
-alias neighbor_disc=neighdisc
-alias readel=meterELstate
-alias nic_startword=nicStartword
-alias nic_netid=nicNetID
-alias nic_prom=nicIgnoreProm
-alias nic_reboot=nicReboot
+imu_info() {
+     uut=$1
+     log_begin=$2
+     log_end=$3
+     of=$4
+     while [ $log_begin -le $log_end ]
+     do
+        #printf "$log_begin\n"
+        nic $uut imu_data read_single $log_begin | tee -a $of
+        log_begin=$[$log_begin+1]
+     done
+ }
 
